@@ -69,6 +69,14 @@ class CheckinResponse(BaseModel):
 # --- 4. FastAPI アプリケーションと API エンドポイント ---
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 開発中はどこからの通信でも許可する
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # DBセッション（接続）を管理する関数
 def get_db():
     db = SessionLocal()
