@@ -143,3 +143,12 @@ def add_reaction(checkin_id: int, reaction: ReactionCreate, db: Session = Depend
     db.commit()
     db.refresh(db_reaction)
     return db_reaction
+
+@app.post("/checkins/reset-all/")
+def reset_all_checkins(db: Session = Depends(get_db)):
+    # is_active が True のものをすべて取得して False に更新
+    active_checkins = db.query(Checkin).filter(Checkin.is_active == True).all()
+    for checkin in active_checkins:
+        checkin.is_active = False
+    db.commit()
+    return {"message": f"{len(active_checkins)} 名を退出させました"}
