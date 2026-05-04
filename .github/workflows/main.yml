@@ -1,0 +1,15 @@
+name: Daily Checkout Reset
+
+on:
+  schedule:
+    # 毎日 UTC 12:00 (日本時間 午後9時) に実行
+    - cron: '0 17 * * *'
+  workflow_dispatch: # 手動で実行したい時用
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Reset API
+        run: |
+          curl -X POST https://venture-platform-backend.onrender.com/checkins/reset-all/
