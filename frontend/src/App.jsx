@@ -119,7 +119,7 @@ function App() {
             <span className="material-symbols-outlined text-primary text-3xl">rocket_launch</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">venture platform</h1>
-          <p className="text-slate-500 text-sm">コワーキングスペースへようこそ。</p>
+          <p className="text-slate-500 text-sm">venture platformへようこそ。</p>
           
           <form onSubmit={handleLogin} className="space-y-4 pt-4">
             <input 
@@ -152,7 +152,6 @@ function App() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold text-slate-600">{currentUser} さん</span>
-          <button onClick={handleLogout} className="text-xs text-slate-400 underline">名前変更</button>
         </div>
       </header>
 
