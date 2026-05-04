@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 # --- 1. データベース設定 ---
 # クラウド（Render）の環境変数からURLを取得。なければPC用のSQLiteを使う（賢い切り替え設計）
@@ -93,6 +94,14 @@ class CheckinResponse(BaseModel):
 
 # --- 4. API エンドポイント ---
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # 全てのサイトからのアクセスを許可
+    allow_credentials=True,
+    allow_methods=["*"], # GET, POST, DELETEなど全て許可
+    allow_headers=["*"], # 全てのヘッダーを許可
+)
 
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
