@@ -10,19 +10,6 @@ const AVATAR_LIST = {
 
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
 
-// 経過時間を計算するヘルパー関数
-const getRelativeTime = (dateStr) => {
-  const now = new Date();
-  const past = new Date(dateStr);
-  const diffInMs = now - past;
-  const diffInMins = Math.floor(diffInMs / (1000 * 60));
-  
-  if (diffInMins < 1) return 'たった今';
-  if (diffInMins < 60) return `${diffInMins}分前`;
-  const diffInHours = Math.floor(diffInMins / 60);
-  return `${diffInHours}時間前`;
-};
-
 function App() {
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("venture_currentUser") || "");
   const [loginInput, setLoginInput] = useState("");
@@ -32,7 +19,6 @@ function App() {
   const [seat, setSeat] = useState("");
   const [task, setTask] = useState("");
 
-  // 🌟 自分が現在チェックインしているかどうかの判定
   const myCheckin = checkins.find(c => c.nickname === currentUser);
 
   useEffect(() => {
@@ -42,7 +28,7 @@ function App() {
         .then(data => setCheckins(data));
     };
     fetchCheckins();
-    const timer = setInterval(fetchCheckins, 30000); // 30秒ごとに更新
+    const timer = setInterval(fetchCheckins, 30000);
     return () => clearInterval(timer);
   }, []);
 
@@ -140,7 +126,6 @@ function App() {
       </header>
 
       <main className="pt-24 px-4 max-w-[600px] mx-auto space-y-8">
-        {/* 🌟 修正1: チェックインしていない時だけフォームを表示 */}
         {!myCheckin ? (
           <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-6">
             <h2 className="text-xl font-bold text-slate-900">チェックイン</h2>
@@ -179,7 +164,6 @@ function App() {
               const likes = reactions.filter(r => r.reaction_type === "like");
               const talks = reactions.filter(r => r.reaction_type === "talk");
               
-              // 🌟 修正3: すでに自分がリアクションしたか判定
               const hasLiked = likes.some(r => r.sender_nickname === currentUser);
               const hasTalked = talks.some(r => r.sender_nickname === currentUser);
 
@@ -190,14 +174,15 @@ function App() {
                     <div className="flex-1">
                       <div className="flex justify-between items-center">
                         <h3 className="font-bold text-sm">{checkin.nickname}</h3>
-                        {/* 🌟 修正2: 経過時間の表示 */}
-                        <span className="text-[10px] text-slate-400">{getRelativeTime(checkin.created_at)}</span>
+                        {/* 🌟 修正ポイント: 時間経過ではなく「座席番号」を表示 */}
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                          {checkin.seat_number}
+                        </span>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">{checkin.task_description}</p>
                     </div>
                   </div>
 
-                  {/* 🌟 修正4: 誰がリアクションしたかの表示 */}
                   {reactions.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {reactions.map((r, idx) => (
