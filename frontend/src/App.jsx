@@ -1,11 +1,28 @@
 import { useState, useEffect } from 'react';
 
 const AVATAR_LIST = {
+  // 動物・ロボット系
   "cat": "https://api.dicebear.com/7.x/notionists/svg?seed=Felix&backgroundColor=e2e8f0",
   "dog": "https://api.dicebear.com/7.x/notionists/svg?seed=Bella&backgroundColor=e2e8f0",
-  "robot": "https://api.dicebear.com/7.x/bottts/svg?seed=Robo&backgroundColor=e2e8f0",
-  "human1": "https://api.dicebear.com/7.x/adventurer/svg?seed=Mimi&backgroundColor=e2e8f0",
-  "human2": "https://api.dicebear.com/7.x/adventurer/svg?seed=Jack&backgroundColor=e2e8f0",
+  "robot1": "https://api.dicebear.com/7.x/bottts/svg?seed=Robo1&backgroundColor=e2e8f0",
+  "robot2": "https://api.dicebear.com/7.x/bottts/svg?seed=Robo2&backgroundColor=e2e8f0",
+  
+  // 人物系 (Notion風)
+  "human1": "https://api.dicebear.com/7.x/notionists/svg?seed=Mimi&backgroundColor=e2e8f0",
+  "human2": "https://api.dicebear.com/7.x/notionists/svg?seed=Jack&backgroundColor=e2e8f0",
+  "human3": "https://api.dicebear.com/7.x/notionists/svg?seed=Sasha&backgroundColor=e2e8f0",
+  "human4": "https://api.dicebear.com/7.x/notionists/svg?seed=Leo&backgroundColor=e2e8f0",
+  
+  // 冒険者・ポップ系 (Adventurer)
+  "adv1": "https://api.dicebear.com/7.x/adventurer/svg?seed=Bear&backgroundColor=e2e8f0",
+  "adv2": "https://api.dicebear.com/7.x/adventurer/svg?seed=Luna&backgroundColor=e2e8f0",
+  "adv3": "https://api.dicebear.com/7.x/adventurer/svg?seed=Oliver&backgroundColor=e2e8f0",
+  
+  // おしゃれ・アート系 (Lorelei)
+  "art1": "https://api.dicebear.com/7.x/lorelei/svg?seed=Aria&backgroundColor=e2e8f0",
+  "art2": "https://api.dicebear.com/7.x/lorelei/svg?seed=Zane&backgroundColor=e2e8f0",
+  "art3": "https://api.dicebear.com/7.x/lorelei/svg?seed=Maya&backgroundColor=e2e8f0",
+  "art4": "https://api.dicebear.com/7.x/lorelei/svg?seed=Ken&backgroundColor=e2e8f0",
 };
 
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
