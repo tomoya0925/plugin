@@ -10,43 +10,48 @@ const AVATAR_LIST = {
 
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
 
+// 経過時間を計算するヘルパー関数
+const getRelativeTime = (dateStr) => {
+  const now = new Date();
+  const past = new Date(dateStr);
+  const diffInMs = now - past;
+  const diffInMins = Math.floor(diffInMs / (1000 * 60));
+  
+  if (diffInMins < 1) return 'たった今';
+  if (diffInMins < 60) return `${diffInMins}分前`;
+  const diffInHours = Math.floor(diffInMins / 60);
+  return `${diffInHours}時間前`;
+};
+
 function App() {
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("venture_currentUser") || "");
   const [loginInput, setLoginInput] = useState("");
   const [loginError, setLoginError] = useState("");
-
   const [checkins, setCheckins] = useState([]);
   const [avatarId, setAvatarId] = useState("cat"); 
   const [seat, setSeat] = useState("");
   const [task, setTask] = useState("");
 
+  // 🌟 自分が現在チェックインしているかどうかの判定
+  const myCheckin = checkins.find(c => c.nickname === currentUser);
+
   useEffect(() => {
-    fetch(`${API_BASE_URL}/checkins/`)
-      .then(res => res.json())
-      .then(data => setCheckins(data));
+    const fetchCheckins = () => {
+      fetch(`${API_BASE_URL}/checkins/`)
+        .then(res => res.json())
+        .then(data => setCheckins(data));
+    };
+    fetchCheckins();
+    const timer = setInterval(fetchCheckins, 30000); // 30秒ごとに更新
+    return () => clearInterval(timer);
   }, []);
 
   const handleLogin = (e) => {
     if (e) e.preventDefault();
     const trimmedInput = loginInput.trim();
     if (!trimmedInput) return;
-
-    const isDuplicate = checkins.some(checkin => checkin.nickname === trimmedInput);
-    if (isDuplicate) {
-      setLoginError("その名前は使用できません。別の名前を入力してください。");
-      return;
-    }
-
-    setLoginError("");
     setCurrentUser(trimmedInput);
     localStorage.setItem("venture_currentUser", trimmedInput);
-  };
-
-  const handleLogout = () => {
-    setCurrentUser("");
-    localStorage.removeItem("venture_currentUser");
-    setLoginInput("");
-    setLoginError("");
   };
 
   const handleCheckin = (e) => {
@@ -74,10 +79,7 @@ function App() {
 
   const handleCheckout = (checkin_id) => {
     if (!window.confirm("チェックアウトして退室しますか？")) return;
-
-    fetch(`${API_BASE_URL}/checkins/${checkin_id}`, {
-      method: "DELETE",
-    })
+    fetch(`${API_BASE_URL}/checkins/${checkin_id}`, { method: "DELETE" })
     .then(() => {
       setCheckins(checkins.filter(c => c.checkin_id !== checkin_id));
     });
@@ -92,23 +94,15 @@ function App() {
         reaction_type: type
       })
     })
-    .then(res => {
-      if (!res.ok) throw new Error("Reaction failed");
-      return res.json();
-    })
+    .then(res => res.json())
     .then(newReaction => {
-      // 画面上の特定のチェックインデータにリアクションを追加して更新
-      setCheckins(prev => prev.map(checkin => {
-        if (checkin.checkin_id === checkin_id) {
-          return {
-            ...checkin,
-            reactions: [...(checkin.reactions || []), newReaction]
-          };
+      setCheckins(prev => prev.map(c => {
+        if (c.checkin_id === checkin_id) {
+          return { ...c, reactions: [...(c.reactions || []), newReaction] };
         }
-        return checkin;
+        return c;
       }));
-    })
-    .catch(err => console.error("Error:", err));
+    });
   };
 
   if (!currentUser) {
@@ -120,7 +114,6 @@ function App() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">venture platform</h1>
           <p className="text-slate-500 text-sm">venture platformへようこそ。</p>
-          
           <form onSubmit={handleLogin} className="space-y-4 pt-4">
             <input 
               value={loginInput}
@@ -128,15 +121,8 @@ function App() {
               required
               className="w-full h-[48px] px-4 rounded-lg bg-slate-50 border border-slate-200 outline-none text-center font-bold text-lg"
               placeholder="ニックネーム" 
-              type="text"
             />
-            {loginError && <p className="text-red-500 text-xs font-bold">{loginError}</p>}
-            <button 
-              type="submit" 
-              className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 transition-all"
-            >
-              はじめる
-            </button>
+            <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 transition-all">はじめる</button>
           </form>
         </div>
       </div>
@@ -150,64 +136,37 @@ function App() {
           <span className="material-symbols-outlined text-primary text-2xl">rocket_launch</span>
           <h1 className="font-bold text-slate-900 text-lg tracking-tighter">venture platform</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-bold text-slate-600">{currentUser} さん</span>
-        </div>
+        <div className="text-sm font-bold text-slate-600">{currentUser} さん</div>
       </header>
 
       <main className="pt-24 px-4 max-w-[600px] mx-auto space-y-8">
-        <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-6">
-          <div className="flex items-center gap-3">
+        {/* 🌟 修正1: チェックインしていない時だけフォームを表示 */}
+        {!myCheckin ? (
+          <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-6">
             <h2 className="text-xl font-bold text-slate-900">チェックイン</h2>
-          </div>
-
-          <form onSubmit={handleCheckin} className="space-y-4">
-            <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-              <label className="text-xs font-bold text-slate-500 uppercase block mb-2">アバターを選択</label>
-              <div className="flex gap-2 overflow-x-auto">
-                {Object.entries(AVATAR_LIST).map(([id, url]) => (
-                  <img 
-                    key={id}
-                    src={url}
-                    alt={id}
-                    onClick={() => setAvatarId(id)}
-                    className={`w-12 h-12 rounded-full cursor-pointer transition-all border-2 ${avatarId === id ? 'border-primary scale-110 shadow-md' : 'border-transparent opacity-50'}`}
-                  />
-                ))}
+            <form onSubmit={handleCheckin} className="space-y-4">
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">アバターを選択</label>
+                <div className="flex gap-2 overflow-x-auto">
+                  {Object.entries(AVATAR_LIST).map(([id, url]) => (
+                    <img key={id} src={url} alt={id} onClick={() => setAvatarId(id)}
+                      className={`w-12 h-12 rounded-full cursor-pointer transition-all border-2 ${avatarId === id ? 'border-primary scale-110 shadow-md' : 'border-transparent opacity-50'}`}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 block">座席番号</label>
-              <input 
-                value={seat}
-                onChange={(e) => setSeat(e.target.value)}
-                required
-                className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none" 
-                placeholder="例: A-12" 
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 block">今日頑張ること</label>
-              <textarea 
-                value={task}
-                onChange={(e) => setTask(e.target.value)}
-                required
-                className="w-full p-4 rounded-lg border border-slate-200 outline-none resize-none" 
-                placeholder="目標を入力..." 
-                rows="3"
-              />
-            </div>
-            
-            <button 
-              type="submit" 
-              className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[20px]">login</span>
-              チェックイン
-            </button>
-          </form>
-        </section>
+              <input value={seat} onChange={(e) => setSeat(e.target.value)} required className="w-full h-[48px] px-4 rounded-lg border border-slate-200" placeholder="座席番号 (例: A-12)" />
+              <textarea value={task} onChange={(e) => setTask(e.target.value)} required className="w-full p-4 rounded-lg border border-slate-200" placeholder="目標を入力..." rows="3" />
+              <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-[20px]">login</span>チェックイン
+              </button>
+            </form>
+          </section>
+        ) : (
+          <div className="bg-green-50 border border-green-100 p-4 rounded-xl text-center">
+            <p className="text-green-700 font-bold text-sm">現在チェックイン中です 🚀</p>
+          </div>
+        )}
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -216,10 +175,14 @@ function App() {
           </div>
           <div className="space-y-4">
             {checkins.map((checkin) => {
-              // リアクションの種類ごとにカウント
-              const likes = (checkin.reactions || []).filter(r => r.reaction_type === "like");
-              const talks = (checkin.reactions || []).filter(r => r.reaction_type === "talk");
+              const reactions = checkin.reactions || [];
+              const likes = reactions.filter(r => r.reaction_type === "like");
+              const talks = reactions.filter(r => r.reaction_type === "talk");
               
+              // 🌟 修正3: すでに自分がリアクションしたか判定
+              const hasLiked = likes.some(r => r.sender_nickname === currentUser);
+              const hasTalked = talks.some(r => r.sender_nickname === currentUser);
+
               return (
                 <div key={checkin.checkin_id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
                   <div className="flex gap-4">
@@ -227,35 +190,44 @@ function App() {
                     <div className="flex-1">
                       <div className="flex justify-between items-center">
                         <h3 className="font-bold text-sm">{checkin.nickname}</h3>
-                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full">{checkin.seat_number}</span>
+                        {/* 🌟 修正2: 経過時間の表示 */}
+                        <span className="text-[10px] text-slate-400">{getRelativeTime(checkin.created_at)}</span>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">{checkin.task_description}</p>
                     </div>
                   </div>
+
+                  {/* 🌟 修正4: 誰がリアクションしたかの表示 */}
+                  {reactions.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {reactions.map((r, idx) => (
+                        <div key={idx} className="text-[9px] bg-slate-50 px-2 py-1 rounded border border-slate-100 text-slate-500">
+                          {r.reaction_type === 'like' ? '👍' : '💬'} {r.sender_nickname}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
                     {currentUser !== checkin.nickname ? (
                       <>
                         <button 
+                          disabled={hasLiked}
                           onClick={() => handleReaction(checkin.checkin_id, "like")} 
-                          className="flex-1 h-10 bg-slate-50 rounded-lg text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1"
+                          className={`flex-1 h-10 rounded-lg text-xs font-bold transition-all ${hasLiked ? 'bg-slate-100 text-slate-400' : 'bg-slate-50 active:scale-95'}`}
                         >
-                          👍 いいね {likes.length > 0 && <span className="text-primary">{likes.length}</span>}
+                          👍 いいね {likes.length > 0 && likes.length}
                         </button>
                         <button 
+                          disabled={hasTalked}
                           onClick={() => handleReaction(checkin.checkin_id, "talk")} 
-                          className="flex-1 h-10 bg-green-50 text-green-600 rounded-lg text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1"
+                          className={`flex-1 h-10 rounded-lg text-xs font-bold transition-all ${hasTalked ? 'bg-green-100 text-green-400' : 'bg-green-50 text-green-600 active:scale-95'}`}
                         >
-                          💬 話したい {talks.length > 0 && <span className="text-green-700">{talks.length}</span>}
+                          💬 話したい {talks.length > 0 && talks.length}
                         </button>
                       </>
                     ) : (
-                      <button 
-                        onClick={() => handleCheckout(checkin.checkin_id)} 
-                        className="w-full h-10 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95"
-                      >
-                        チェックアウト
-                      </button>
+                      <button onClick={() => handleCheckout(checkin.checkin_id)} className="w-full h-10 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95">チェックアウト</button>
                     )}
                   </div>
                 </div>
