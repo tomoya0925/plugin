@@ -8,7 +8,6 @@ const AVATAR_LIST = {
   "human2": "https://api.dicebear.com/7.x/adventurer/svg?seed=Jack&backgroundColor=e2e8f0",
 };
 
-// ベースURLを変数にしておくと修正が楽でミスも減ります
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
 
 function App() {
@@ -22,7 +21,6 @@ function App() {
   const [task, setTask] = useState("");
 
   useEffect(() => {
-    // 修正：末尾に /checkins/ を追加
     fetch(`${API_BASE_URL}/checkins/`)
       .then(res => res.json())
       .then(data => setCheckins(data));
@@ -61,7 +59,6 @@ function App() {
       task_description: task
     };
 
-    // 修正：URLの末尾に / を追加
     fetch(`${API_BASE_URL}/checkins/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -78,7 +75,6 @@ function App() {
   const handleCheckout = (checkin_id) => {
     if (!window.confirm("チェックアウトして退室しますか？")) return;
 
-    // 修正：URLの繋ぎ目を修正 (/checkins/ID)
     fetch(`${API_BASE_URL}/checkins/${checkin_id}`, {
       method: "DELETE",
     })
@@ -88,7 +84,6 @@ function App() {
   };
 
   const handleReaction = (checkin_id, type) => {
-    // 修正：URLの繋ぎ目を修正
     fetch(`${API_BASE_URL}/checkins/${checkin_id}/reactions/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,9 +92,13 @@ function App() {
         reaction_type: type
       })
     })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) throw new Error("Reaction failed");
+      return res.json();
+    })
     .then(newReaction => {
-      setCheckins(checkins.map(checkin => {
+      // 画面上の特定のチェックインデータにリアクションを追加して更新
+      setCheckins(prev => prev.map(checkin => {
         if (checkin.checkin_id === checkin_id) {
           return {
             ...checkin,
@@ -108,7 +107,8 @@ function App() {
         }
         return checkin;
       }));
-    });
+    })
+    .catch(err => console.error("Error:", err));
   };
 
   if (!currentUser) {
@@ -199,7 +199,6 @@ function App() {
               />
             </div>
             
-            {/* 🌟 修正ポイント：スマホでも確実に反応するように active:scale を追加 */}
             <button 
               type="submit" 
               className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -210,7 +209,6 @@ function App() {
           </form>
         </section>
 
-        {/* タイムライン部分（変更なし、URL修正により動くようになります） */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-slate-900">タイムライン</h2>
@@ -218,8 +216,10 @@ function App() {
           </div>
           <div className="space-y-4">
             {checkins.map((checkin) => {
+              // リアクションの種類ごとにカウント
               const likes = (checkin.reactions || []).filter(r => r.reaction_type === "like");
               const talks = (checkin.reactions || []).filter(r => r.reaction_type === "talk");
+              
               return (
                 <div key={checkin.checkin_id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
                   <div className="flex gap-4">
@@ -232,14 +232,30 @@ function App() {
                       <p className="text-sm text-slate-600 mt-1">{checkin.task_description}</p>
                     </div>
                   </div>
+                  
                   <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
                     {currentUser !== checkin.nickname ? (
                       <>
-                        <button onClick={() => handleReaction(checkin.checkin_id, "like")} className="flex-1 h-10 bg-slate-50 rounded-lg text-xs font-bold active:scale-95 transition-all">👍 いいね</button>
-                        <button onClick={() => handleReaction(checkin.checkin_id, "talk")} className="flex-1 h-10 bg-green-50 text-green-600 rounded-lg text-xs font-bold active:scale-95 transition-all">💬 話したい</button>
+                        <button 
+                          onClick={() => handleReaction(checkin.checkin_id, "like")} 
+                          className="flex-1 h-10 bg-slate-50 rounded-lg text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1"
+                        >
+                          👍 いいね {likes.length > 0 && <span className="text-primary">{likes.length}</span>}
+                        </button>
+                        <button 
+                          onClick={() => handleReaction(checkin.checkin_id, "talk")} 
+                          className="flex-1 h-10 bg-green-50 text-green-600 rounded-lg text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1"
+                        >
+                          💬 話したい {talks.length > 0 && <span className="text-green-700">{talks.length}</span>}
+                        </button>
                       </>
                     ) : (
-                      <button onClick={() => handleCheckout(checkin.checkin_id)} className="w-full h-10 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95">チェックアウト</button>
+                      <button 
+                        onClick={() => handleCheckout(checkin.checkin_id)} 
+                        className="w-full h-10 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95"
+                      >
+                        チェックアウト
+                      </button>
                     )}
                   </div>
                 </div>
