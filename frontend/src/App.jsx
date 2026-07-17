@@ -27,6 +27,7 @@ function App() {
   const [profiles, setProfiles] = useState([]);
   const [activeTab, setActiveTab] = useState("today");
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [avatarId, setAvatarId] = useState("cat");
   const [seat, setSeat] = useState("");
   const [task, setTask] = useState("");
@@ -167,7 +168,8 @@ function App() {
             ? prev.map(p => p.nickname === savedProfile.nickname ? savedProfile : p)
             : [savedProfile, ...prev];
         });
-        setSelectedProfile(savedProfile);
+        setSelectedProfile(null);
+        setIsEditingProfile(false);
       });
   };
 
@@ -240,8 +242,10 @@ function App() {
             currentUser={currentUser}
             profiles={profiles}
             selectedProfile={selectedProfile}
+            isEditingProfile={isEditingProfile}
             profileForm={profileForm}
             setSelectedProfile={setSelectedProfile}
+            setIsEditingProfile={setIsEditingProfile}
             setProfileForm={setProfileForm}
             onProfileSave={handleProfileSave}
           />
@@ -411,62 +415,82 @@ function LongTermView({
   currentUser,
   profiles,
   selectedProfile,
+  isEditingProfile,
   profileForm,
   setSelectedProfile,
+  setIsEditingProfile,
   setProfileForm,
   onProfileSave,
 }) {
-  const shownProfile = selectedProfile || profiles.find(p => p.nickname === currentUser);
+  const myProfile = profiles.find(p => p.nickname === currentUser);
+  const shouldShowProfileForm = !myProfile || isEditingProfile;
 
   return (
     <div className="space-y-6">
       <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">中長期で頑張っていること</h2>
-          <p className="text-sm text-slate-500 mt-1">今のテーマと、ほしいつながりを掲載できます。</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">中長期で頑張っていること</h2>
+            <p className="text-sm text-slate-500 mt-1">今のテーマと、ほしいつながりを掲載できます。</p>
+          </div>
+          {myProfile && !isEditingProfile && (
+            <button
+              onClick={() => setIsEditingProfile(true)}
+              className="h-9 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold shrink-0 active:scale-95"
+            >
+              再入力する
+            </button>
+          )}
         </div>
-        <form onSubmit={onProfileSave} className="space-y-4">
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-2">今頑張っていること</label>
-            <input
-              value={profileForm.current_focus}
-              onChange={(e) => setProfileForm(prev => ({ ...prev, current_focus: e.target.value }))}
-              required
-              maxLength={120}
-              className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
-              placeholder="例: SaaSの初期顧客ヒアリング"
-            />
+
+        {shouldShowProfileForm ? (
+          <form onSubmit={onProfileSave} className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-2">今頑張っていること</label>
+              <input
+                value={profileForm.current_focus}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, current_focus: e.target.value }))}
+                required
+                maxLength={120}
+                className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+                placeholder="例: SaaSの初期顧客ヒアリング"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-2">ほしいつながり</label>
+              <input
+                value={profileForm.desired_connections}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, desired_connections: e.target.value }))}
+                required
+                maxLength={120}
+                className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+                placeholder="例: BtoB営業に詳しい人、デザイナー"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-2">プロフィール</label>
+              <textarea
+                value={profileForm.profile_text}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, profile_text: e.target.value }))}
+                maxLength={800}
+                className="w-full p-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+                placeholder="背景、相談したいこと、話しかけてほしいことなど"
+                rows="4"
+              />
+            </div>
+            <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95">
+              掲載する
+            </button>
+          </form>
+        ) : (
+          <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-sm text-slate-600">
+            掲載済みです。内容を変える場合は右上の「再入力する」から編集できます。
           </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-2">ほしいつながり</label>
-            <input
-              value={profileForm.desired_connections}
-              onChange={(e) => setProfileForm(prev => ({ ...prev, desired_connections: e.target.value }))}
-              required
-              maxLength={120}
-              className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
-              placeholder="例: BtoB営業に詳しい人、デザイナー"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 block mb-2">プロフィール</label>
-            <textarea
-              value={profileForm.profile_text}
-              onChange={(e) => setProfileForm(prev => ({ ...prev, profile_text: e.target.value }))}
-              maxLength={800}
-              className="w-full p-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
-              placeholder="背景、相談したいこと、話しかけてほしいことなど"
-              rows="4"
-            />
-          </div>
-          <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95">
-            掲載する
-          </button>
-        </form>
+        )}
       </section>
 
-      {shownProfile && (
-        <ProfileDetail profile={shownProfile} onBack={() => setSelectedProfile(null)} />
+      {selectedProfile && (
+        <ProfileDetail profile={selectedProfile} onBack={() => setSelectedProfile(null)} />
       )}
 
       <section className="space-y-4">
