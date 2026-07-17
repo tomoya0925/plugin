@@ -1,28 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 
 const AVATAR_LIST = {
-  // 動物・ロボット系
-  "cat": "https://api.dicebear.com/7.x/notionists/svg?seed=Felix&backgroundColor=e2e8f0",
-  "dog": "https://api.dicebear.com/7.x/notionists/svg?seed=Bella&backgroundColor=e2e8f0",
-  "robot1": "https://api.dicebear.com/7.x/bottts/svg?seed=Robo1&backgroundColor=e2e8f0",
-  "robot2": "https://api.dicebear.com/7.x/bottts/svg?seed=Robo2&backgroundColor=e2e8f0",
-  
-  // 人物系 (Notion風)
-  "human1": "https://api.dicebear.com/7.x/notionists/svg?seed=Mimi&backgroundColor=e2e8f0",
-  "human2": "https://api.dicebear.com/7.x/notionists/svg?seed=Jack&backgroundColor=e2e8f0",
-  "human3": "https://api.dicebear.com/7.x/notionists/svg?seed=Sasha&backgroundColor=e2e8f0",
-  "human4": "https://api.dicebear.com/7.x/notionists/svg?seed=Leo&backgroundColor=e2e8f0",
-  
-  // 冒険者・ポップ系 (Adventurer)
-  "adv1": "https://api.dicebear.com/7.x/adventurer/svg?seed=Bear&backgroundColor=e2e8f0",
-  "adv2": "https://api.dicebear.com/7.x/adventurer/svg?seed=Luna&backgroundColor=e2e8f0",
-  "adv3": "https://api.dicebear.com/7.x/adventurer/svg?seed=Oliver&backgroundColor=e2e8f0",
-  
-  // おしゃれ・アート系 (Lorelei)
-  "art1": "https://api.dicebear.com/7.x/lorelei/svg?seed=Aria&backgroundColor=e2e8f0",
-  "art2": "https://api.dicebear.com/7.x/lorelei/svg?seed=Zane&backgroundColor=e2e8f0",
-  "art3": "https://api.dicebear.com/7.x/lorelei/svg?seed=Maya&backgroundColor=e2e8f0",
-  "art4": "https://api.dicebear.com/7.x/lorelei/svg?seed=Ken&backgroundColor=e2e8f0",
+  cat: "https://api.dicebear.com/7.x/notionists/svg?seed=Felix&backgroundColor=e2e8f0",
+  dog: "https://api.dicebear.com/7.x/notionists/svg?seed=Bella&backgroundColor=e2e8f0",
+  robot1: "https://api.dicebear.com/7.x/bottts/svg?seed=Robo1&backgroundColor=e2e8f0",
+  robot2: "https://api.dicebear.com/7.x/bottts/svg?seed=Robo2&backgroundColor=e2e8f0",
+  human1: "https://api.dicebear.com/7.x/notionists/svg?seed=Mimi&backgroundColor=e2e8f0",
+  human2: "https://api.dicebear.com/7.x/notionists/svg?seed=Jack&backgroundColor=e2e8f0",
+  human3: "https://api.dicebear.com/7.x/notionists/svg?seed=Sasha&backgroundColor=e2e8f0",
+  human4: "https://api.dicebear.com/7.x/notionists/svg?seed=Leo&backgroundColor=e2e8f0",
+  adv1: "https://api.dicebear.com/7.x/adventurer/svg?seed=Bear&backgroundColor=e2e8f0",
+  adv2: "https://api.dicebear.com/7.x/adventurer/svg?seed=Luna&backgroundColor=e2e8f0",
+  adv3: "https://api.dicebear.com/7.x/adventurer/svg?seed=Oliver&backgroundColor=e2e8f0",
+  art1: "https://api.dicebear.com/7.x/lorelei/svg?seed=Aria&backgroundColor=e2e8f0",
+  art2: "https://api.dicebear.com/7.x/lorelei/svg?seed=Zane&backgroundColor=e2e8f0",
+  art3: "https://api.dicebear.com/7.x/lorelei/svg?seed=Maya&backgroundColor=e2e8f0",
+  art4: "https://api.dicebear.com/7.x/lorelei/svg?seed=Ken&backgroundColor=e2e8f0",
 };
 
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
@@ -30,24 +23,51 @@ const API_BASE_URL = "https://venture-platform-backend.onrender.com";
 function App() {
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("venture_currentUser") || "");
   const [loginInput, setLoginInput] = useState("");
-  const [loginError, setLoginError] = useState("");
   const [checkins, setCheckins] = useState([]);
-  const [avatarId, setAvatarId] = useState("cat"); 
+  const [profiles, setProfiles] = useState([]);
+  const [activeTab, setActiveTab] = useState("today");
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [avatarId, setAvatarId] = useState("cat");
   const [seat, setSeat] = useState("");
   const [task, setTask] = useState("");
+  const [commentInputs, setCommentInputs] = useState({});
+  const [profileForm, setProfileForm] = useState({
+    current_focus: "",
+    desired_connections: "",
+    profile_text: "",
+  });
 
   const myCheckin = checkins.find(c => c.nickname === currentUser);
 
+  const fetchCheckins = useCallback(() => {
+    fetch(`${API_BASE_URL}/checkins/`)
+      .then(res => res.json())
+      .then(data => setCheckins(Array.isArray(data) ? data : []));
+  }, []);
+
+  const fetchProfiles = useCallback(() => {
+    fetch(`${API_BASE_URL}/long-term-profiles/`)
+      .then(res => res.json())
+      .then(data => {
+        const nextProfiles = Array.isArray(data) ? data : [];
+        const currentProfile = nextProfiles.find(p => p.nickname === currentUser);
+        setProfiles(nextProfiles);
+        if (currentProfile) {
+          setProfileForm({
+            current_focus: currentProfile.current_focus || "",
+            desired_connections: currentProfile.desired_connections || "",
+            profile_text: currentProfile.profile_text || "",
+          });
+        }
+      });
+  }, [currentUser]);
+
   useEffect(() => {
-    const fetchCheckins = () => {
-      fetch(`${API_BASE_URL}/checkins/`)
-        .then(res => res.json())
-        .then(data => setCheckins(data));
-    };
     fetchCheckins();
+    fetchProfiles();
     const timer = setInterval(fetchCheckins, 30000);
     return () => clearInterval(timer);
-  }, []);
+  }, [fetchCheckins, fetchProfiles]);
 
   const handleLogin = (e) => {
     if (e) e.preventDefault();
@@ -60,32 +80,30 @@ function App() {
   const handleCheckin = (e) => {
     if (e) e.preventDefault();
     const newCheckin = {
-      user_id: 1, 
-      nickname: currentUser, 
-      avatar_id: avatarId, 
+      user_id: 1,
+      nickname: currentUser,
+      avatar_id: avatarId,
       seat_number: seat,
-      task_description: task
+      task_description: task,
     };
 
     fetch(`${API_BASE_URL}/checkins/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newCheckin)
+      body: JSON.stringify(newCheckin),
     })
-    .then(res => res.json())
-    .then(data => {
-      setCheckins([...checkins, data]);
-      setSeat("");
-      setTask("");
-    });
+      .then(res => res.json())
+      .then(data => {
+        setCheckins([...checkins, data]);
+        setSeat("");
+        setTask("");
+      });
   };
 
   const handleCheckout = (checkin_id) => {
     if (!window.confirm("チェックアウトして退室しますか？")) return;
     fetch(`${API_BASE_URL}/checkins/${checkin_id}`, { method: "DELETE" })
-    .then(() => {
-      setCheckins(checkins.filter(c => c.checkin_id !== checkin_id));
-    });
+      .then(() => setCheckins(checkins.filter(c => c.checkin_id !== checkin_id)));
   };
 
   const handleReaction = (checkin_id, type) => {
@@ -94,18 +112,63 @@ function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sender_nickname: currentUser,
-        reaction_type: type
-      })
+        reaction_type: type,
+      }),
     })
-    .then(res => res.json())
-    .then(newReaction => {
-      setCheckins(prev => prev.map(c => {
-        if (c.checkin_id === checkin_id) {
-          return { ...c, reactions: [...(c.reactions || []), newReaction] };
-        }
-        return c;
-      }));
-    });
+      .then(res => res.json())
+      .then(newReaction => {
+        setCheckins(prev => prev.map(c => (
+          c.checkin_id === checkin_id
+            ? { ...c, reactions: [...(c.reactions || []), newReaction] }
+            : c
+        )));
+      });
+  };
+
+  const handleComment = (e, checkin_id) => {
+    e.preventDefault();
+    const body = (commentInputs[checkin_id] || "").trim();
+    if (!body) return;
+
+    fetch(`${API_BASE_URL}/checkins/${checkin_id}/comments/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender_nickname: currentUser,
+        body,
+      }),
+    })
+      .then(res => res.json())
+      .then(newComment => {
+        setCheckins(prev => prev.map(c => (
+          c.checkin_id === checkin_id
+            ? { ...c, comments: [...(c.comments || []), newComment] }
+            : c
+        )));
+        setCommentInputs(prev => ({ ...prev, [checkin_id]: "" }));
+      });
+  };
+
+  const handleProfileSave = (e) => {
+    e.preventDefault();
+    fetch(`${API_BASE_URL}/long-term-profiles/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nickname: currentUser,
+        ...profileForm,
+      }),
+    })
+      .then(res => res.json())
+      .then(savedProfile => {
+        setProfiles(prev => {
+          const exists = prev.some(p => p.nickname === savedProfile.nickname);
+          return exists
+            ? prev.map(p => p.nickname === savedProfile.nickname ? savedProfile : p)
+            : [savedProfile, ...prev];
+        });
+        setSelectedProfile(savedProfile);
+      });
   };
 
   if (!currentUser) {
@@ -118,12 +181,12 @@ function App() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">venture platform</h1>
           <p className="text-slate-500 text-sm">venture platformへようこそ。</p>
           <form onSubmit={handleLogin} className="space-y-4 pt-4">
-            <input 
+            <input
               value={loginInput}
               onChange={(e) => setLoginInput(e.target.value)}
               required
               className="w-full h-[48px] px-4 rounded-lg bg-slate-50 border border-slate-200 outline-none text-center font-bold text-lg"
-              placeholder="ニックネーム" 
+              placeholder="ニックネーム"
             />
             <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 transition-all">はじめる</button>
           </form>
@@ -134,111 +197,340 @@ function App() {
 
   return (
     <div className="bg-background text-on-surface min-h-screen font-['Plus_Jakarta_Sans'] pb-24">
-      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-white/80 backdrop-blur-lg border-b border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary text-2xl">rocket_launch</span>
-          <h1 className="font-bold text-slate-900 text-lg tracking-tighter">venture platform</h1>
+      <header className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-lg border-b border-slate-200 shadow-sm">
+        <div className="max-w-[720px] mx-auto px-4 h-16 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary text-2xl">rocket_launch</span>
+            <h1 className="font-bold text-slate-900 text-lg tracking-tighter">venture platform</h1>
+          </div>
+          <div className="text-sm font-bold text-slate-600">{currentUser} さん</div>
         </div>
-        <div className="text-sm font-bold text-slate-600">{currentUser} さん</div>
       </header>
 
-      <main className="pt-24 px-4 max-w-[600px] mx-auto space-y-8">
-        {!myCheckin ? (
-          <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-6">
-            <h2 className="text-xl font-bold text-slate-900">チェックイン</h2>
-            <form onSubmit={handleCheckin} className="space-y-4">
-              <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">アバターを選択</label>
-                <div className="flex gap-2 overflow-x-auto">
-                  {Object.entries(AVATAR_LIST).map(([id, url]) => (
-                    <img key={id} src={url} alt={id} onClick={() => setAvatarId(id)}
-                      className={`w-12 h-12 rounded-full cursor-pointer transition-all border-2 ${avatarId === id ? 'border-primary scale-110 shadow-md' : 'border-transparent opacity-50'}`}
-                    />
-                  ))}
-                </div>
-              </div>
-              <input value={seat} onChange={(e) => setSeat(e.target.value)} required className="w-full h-[48px] px-4 rounded-lg border border-slate-200" placeholder="座席番号 (例: A-12)" />
-              <textarea value={task} onChange={(e) => setTask(e.target.value)} required className="w-full p-4 rounded-lg border border-slate-200" placeholder="目標を入力..." rows="3" />
-              <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined text-[20px]">login</span>チェックイン
-              </button>
-            </form>
-          </section>
+      <main className="pt-24 px-4 max-w-[720px] mx-auto space-y-8">
+        <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <button onClick={() => setActiveTab("today")} className={`h-10 rounded-lg text-sm font-bold ${activeTab === "today" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+            今日
+          </button>
+          <button onClick={() => setActiveTab("longTerm")} className={`h-10 rounded-lg text-sm font-bold ${activeTab === "longTerm" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+            中長期
+          </button>
+        </div>
+
+        {activeTab === "today" ? (
+          <TodayView
+            currentUser={currentUser}
+            myCheckin={myCheckin}
+            checkins={checkins}
+            avatarId={avatarId}
+            seat={seat}
+            task={task}
+            commentInputs={commentInputs}
+            setAvatarId={setAvatarId}
+            setSeat={setSeat}
+            setTask={setTask}
+            setCommentInputs={setCommentInputs}
+            onCheckin={handleCheckin}
+            onCheckout={handleCheckout}
+            onReaction={handleReaction}
+            onComment={handleComment}
+          />
         ) : (
-          <div className="bg-green-50 border border-green-100 p-4 rounded-xl text-center">
-            <p className="text-green-700 font-bold text-sm">現在チェックイン中です 🚀</p>
-          </div>
+          <LongTermView
+            currentUser={currentUser}
+            profiles={profiles}
+            selectedProfile={selectedProfile}
+            profileForm={profileForm}
+            setSelectedProfile={setSelectedProfile}
+            setProfileForm={setProfileForm}
+            onProfileSave={handleProfileSave}
+          />
         )}
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">タイムライン</h2>
-            <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">{checkins.length}名が活動中</span>
-          </div>
-          <div className="space-y-4">
-            {checkins.map((checkin) => {
-              const reactions = checkin.reactions || [];
-              const likes = reactions.filter(r => r.reaction_type === "like");
-              const talks = reactions.filter(r => r.reaction_type === "talk");
-              
-              const hasLiked = likes.some(r => r.sender_nickname === currentUser);
-              const hasTalked = talks.some(r => r.sender_nickname === currentUser);
-
-              return (
-                <div key={checkin.checkin_id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                  <div className="flex gap-4">
-                    <img src={AVATAR_LIST[checkin.avatar_id] || AVATAR_LIST["cat"]} className="w-12 h-12 rounded-full shrink-0" alt="avatar" />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-bold text-sm">{checkin.nickname}</h3>
-                        {/* 🌟 修正ポイント: 時間経過ではなく「座席番号」を表示 */}
-                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
-                          {checkin.seat_number}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-600 mt-1">{checkin.task_description}</p>
-                    </div>
-                  </div>
-
-                  {reactions.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {reactions.map((r, idx) => (
-                        <div key={idx} className="text-[9px] bg-slate-50 px-2 py-1 rounded border border-slate-100 text-slate-500">
-                          {r.reaction_type === 'like' ? '👍' : '💬'} {r.sender_nickname}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
-                    {currentUser !== checkin.nickname ? (
-                      <>
-                        <button 
-                          disabled={hasLiked}
-                          onClick={() => handleReaction(checkin.checkin_id, "like")} 
-                          className={`flex-1 h-10 rounded-lg text-xs font-bold transition-all ${hasLiked ? 'bg-slate-100 text-slate-400' : 'bg-slate-50 active:scale-95'}`}
-                        >
-                          👍 いいね {likes.length > 0 && likes.length}
-                        </button>
-                        <button 
-                          disabled={hasTalked}
-                          onClick={() => handleReaction(checkin.checkin_id, "talk")} 
-                          className={`flex-1 h-10 rounded-lg text-xs font-bold transition-all ${hasTalked ? 'bg-green-100 text-green-400' : 'bg-green-50 text-green-600 active:scale-95'}`}
-                        >
-                          💬 話したい {talks.length > 0 && talks.length}
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => handleCheckout(checkin.checkin_id)} className="w-full h-10 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95">チェックアウト</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
       </main>
     </div>
+  );
+}
+
+function TodayView({
+  currentUser,
+  myCheckin,
+  checkins,
+  avatarId,
+  seat,
+  task,
+  commentInputs,
+  setAvatarId,
+  setSeat,
+  setTask,
+  setCommentInputs,
+  onCheckin,
+  onCheckout,
+  onReaction,
+  onComment,
+}) {
+  return (
+    <>
+      {!myCheckin ? (
+        <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-6">
+          <h2 className="text-xl font-bold text-slate-900">チェックイン</h2>
+          <form onSubmit={onCheckin} className="space-y-4">
+            <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-2">アバターを選択</label>
+              <div className="flex gap-2 overflow-x-auto">
+                {Object.entries(AVATAR_LIST).map(([id, url]) => (
+                  <img
+                    key={id}
+                    src={url}
+                    alt={id}
+                    onClick={() => setAvatarId(id)}
+                    className={`w-12 h-12 rounded-full cursor-pointer transition-all border-2 ${avatarId === id ? 'border-primary scale-110 shadow-md' : 'border-transparent opacity-50'}`}
+                  />
+                ))}
+              </div>
+            </div>
+            <input value={seat} onChange={(e) => setSeat(e.target.value)} required className="w-full h-[48px] px-4 rounded-lg border border-slate-200" placeholder="座席番号 (例: A-12)" />
+            <textarea value={task} onChange={(e) => setTask(e.target.value)} required className="w-full p-4 rounded-lg border border-slate-200" placeholder="今日頑張ることを入力..." rows="3" />
+            <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95 flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined text-[20px]">login</span>チェックイン
+            </button>
+          </form>
+        </section>
+      ) : (
+        <div className="bg-green-50 border border-green-100 p-4 rounded-xl text-center">
+          <p className="text-green-700 font-bold text-sm">現在チェックイン中です 🚀</p>
+        </div>
+      )}
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900">タイムライン</h2>
+          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">{checkins.length}名が活動中</span>
+        </div>
+        <div className="space-y-4">
+          {checkins.map((checkin) => (
+            <CheckinCard
+              key={checkin.checkin_id}
+              checkin={checkin}
+              currentUser={currentUser}
+              commentValue={commentInputs[checkin.checkin_id] || ""}
+              setCommentInputs={setCommentInputs}
+              onCheckout={onCheckout}
+              onReaction={onReaction}
+              onComment={onComment}
+            />
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onCheckout, onReaction, onComment }) {
+  const reactions = checkin.reactions || [];
+  const comments = checkin.comments || [];
+  const likes = reactions.filter(r => r.reaction_type === "like");
+  const talks = reactions.filter(r => r.reaction_type === "talk");
+  const hasLiked = likes.some(r => r.sender_nickname === currentUser);
+  const hasTalked = talks.some(r => r.sender_nickname === currentUser);
+
+  return (
+    <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+      <div className="flex gap-4">
+        <img src={AVATAR_LIST[checkin.avatar_id] || AVATAR_LIST.cat} className="w-12 h-12 rounded-full shrink-0" alt="avatar" />
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center gap-3">
+            <h3 className="font-bold text-sm truncate">{checkin.nickname}</h3>
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold shrink-0">
+              {checkin.seat_number}
+            </span>
+          </div>
+          <p className="text-sm text-slate-600 mt-1 break-words">{checkin.task_description}</p>
+        </div>
+      </div>
+
+      {reactions.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {reactions.map((r) => (
+            <div key={r.reaction_id} className="text-[9px] bg-slate-50 px-2 py-1 rounded border border-slate-100 text-slate-500">
+              {r.reaction_type === 'like' ? '👍' : '💬'} {r.sender_nickname}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
+        {currentUser !== checkin.nickname ? (
+          <>
+            <button
+              disabled={hasLiked}
+              onClick={() => onReaction(checkin.checkin_id, "like")}
+              className={`flex-1 h-10 rounded-lg text-xs font-bold transition-all ${hasLiked ? 'bg-slate-100 text-slate-400' : 'bg-slate-50 active:scale-95'}`}
+            >
+              👍 いいね {likes.length > 0 && likes.length}
+            </button>
+            <button
+              disabled={hasTalked}
+              onClick={() => onReaction(checkin.checkin_id, "talk")}
+              className={`flex-1 h-10 rounded-lg text-xs font-bold transition-all ${hasTalked ? 'bg-green-100 text-green-400' : 'bg-green-50 text-green-600 active:scale-95'}`}
+            >
+              💬 話したい {talks.length > 0 && talks.length}
+            </button>
+          </>
+        ) : (
+          <button onClick={() => onCheckout(checkin.checkin_id)} className="w-full h-10 bg-red-50 text-red-500 rounded-lg text-xs font-bold active:scale-95">チェックアウト</button>
+        )}
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-slate-100 space-y-3">
+        {comments.length > 0 && (
+          <div className="space-y-2">
+            {comments.map((comment) => (
+              <div key={comment.comment_id} className="bg-slate-50 rounded-lg px-3 py-2">
+                <div className="text-[10px] font-bold text-slate-500">{comment.sender_nickname}</div>
+                <p className="text-xs text-slate-700 mt-0.5 break-words">{comment.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <form onSubmit={(e) => onComment(e, checkin.checkin_id)} className="flex gap-2">
+          <input
+            value={commentValue}
+            onChange={(e) => setCommentInputs(prev => ({ ...prev, [checkin.checkin_id]: e.target.value }))}
+            className="flex-1 min-w-0 h-10 px-3 rounded-lg border border-slate-200 text-xs outline-none focus:border-primary"
+            placeholder="応援コメントを書く"
+            maxLength={300}
+          />
+          <button type="submit" className="w-16 h-10 bg-slate-900 text-white rounded-lg text-xs font-bold active:scale-95">送信</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function LongTermView({
+  currentUser,
+  profiles,
+  selectedProfile,
+  profileForm,
+  setSelectedProfile,
+  setProfileForm,
+  onProfileSave,
+}) {
+  const shownProfile = selectedProfile || profiles.find(p => p.nickname === currentUser);
+
+  return (
+    <div className="space-y-6">
+      <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">中長期で頑張っていること</h2>
+          <p className="text-sm text-slate-500 mt-1">今のテーマと、ほしいつながりを掲載できます。</p>
+        </div>
+        <form onSubmit={onProfileSave} className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-2">今頑張っていること</label>
+            <input
+              value={profileForm.current_focus}
+              onChange={(e) => setProfileForm(prev => ({ ...prev, current_focus: e.target.value }))}
+              required
+              maxLength={120}
+              className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+              placeholder="例: SaaSの初期顧客ヒアリング"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-2">ほしいつながり</label>
+            <input
+              value={profileForm.desired_connections}
+              onChange={(e) => setProfileForm(prev => ({ ...prev, desired_connections: e.target.value }))}
+              required
+              maxLength={120}
+              className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+              placeholder="例: BtoB営業に詳しい人、デザイナー"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 block mb-2">プロフィール</label>
+            <textarea
+              value={profileForm.profile_text}
+              onChange={(e) => setProfileForm(prev => ({ ...prev, profile_text: e.target.value }))}
+              maxLength={800}
+              className="w-full p-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+              placeholder="背景、相談したいこと、話しかけてほしいことなど"
+              rows="4"
+            />
+          </div>
+          <button type="submit" className="w-full h-12 bg-primary text-white font-bold rounded-lg shadow-md active:scale-95">
+            掲載する
+          </button>
+        </form>
+      </section>
+
+      {shownProfile && (
+        <ProfileDetail profile={shownProfile} onBack={() => setSelectedProfile(null)} />
+      )}
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900">掲載メンバー</h2>
+          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">{profiles.length}名</span>
+        </div>
+        <div className="grid gap-3">
+          {profiles.map((profile) => (
+            <button
+              key={profile.profile_id}
+              onClick={() => setSelectedProfile(profile)}
+              className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm text-left active:scale-[0.99]"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-slate-900 truncate">{profile.nickname}</h3>
+                  <p className="text-sm text-slate-700 mt-2 break-words">{profile.current_focus}</p>
+                  <p className="text-xs text-primary font-bold mt-2 break-words">つながりたい: {profile.desired_connections}</p>
+                </div>
+                <span className="material-symbols-outlined text-slate-300 shrink-0">chevron_right</span>
+              </div>
+            </button>
+          ))}
+          {profiles.length === 0 && (
+            <div className="bg-white rounded-xl p-6 border border-slate-200 text-center text-sm text-slate-500">
+              まだ掲載がありません。
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ProfileDetail({ profile, onBack }) {
+  return (
+    <section className="bg-slate-900 text-white rounded-xl p-6 shadow-sm space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs font-bold text-primary mb-1">PROFILE</div>
+          <h2 className="text-2xl font-bold break-words">{profile.nickname}</h2>
+        </div>
+        <button onClick={onBack} className="h-9 px-3 rounded-lg bg-white/10 text-xs font-bold">
+          閉じる
+        </button>
+      </div>
+      <div className="grid gap-3">
+        <div className="bg-white/10 rounded-lg p-4">
+          <div className="text-xs font-bold text-slate-300">今頑張っていること</div>
+          <p className="text-sm mt-2 break-words">{profile.current_focus}</p>
+        </div>
+        <div className="bg-white/10 rounded-lg p-4">
+          <div className="text-xs font-bold text-slate-300">ほしいつながり</div>
+          <p className="text-sm mt-2 break-words">{profile.desired_connections}</p>
+        </div>
+        {profile.profile_text && (
+          <div className="bg-white/10 rounded-lg p-4">
+            <div className="text-xs font-bold text-slate-300">プロフィール</div>
+            <p className="text-sm mt-2 leading-6 whitespace-pre-wrap break-words">{profile.profile_text}</p>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

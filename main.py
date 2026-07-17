@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
@@ -43,6 +43,24 @@ class Reaction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     checkin = relationship("Checkin", back_populates="reactions")
 
+class Comment(Base):
+    __tablename__ = "comments"
+    comment_id = Column(Integer, primary_key=True, index=True)
+    checkin_id = Column(Integer, ForeignKey("checkins.checkin_id"), nullable=False)
+    sender_nickname = Column(String(50), nullable=False)
+    body = Column(String(300), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    checkin = relationship("Checkin", back_populates="comments")
+
+class LongTermProfile(Base):
+    __tablename__ = "long_term_profiles"
+    profile_id = Column(Integer, primary_key=True, index=True)
+    nickname = Column(String(50), nullable=False, unique=True, index=True)
+    current_focus = Column(String(120), nullable=False)
+    desired_connections = Column(String(120), nullable=False)
+    profile_text = Column(String(800), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class Checkin(Base):
     __tablename__ = "checkins"
     checkin_id = Column(Integer, primary_key=True, index=True)
@@ -56,6 +74,7 @@ class Checkin(Base):
     user = relationship("User", back_populates="checkins")
     # 【追加】チェックインとリアクションを紐付ける
     reactions = relationship("Reaction", back_populates="checkin", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="checkin", cascade="all, delete-orphan")
 
 Base.metadata.create_all(bind=engine)
 
@@ -68,6 +87,37 @@ class ReactionResponse(BaseModel):
     reaction_id: int
     sender_nickname: str
     reaction_type: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CommentCreate(BaseModel):
+    sender_nickname: str
+    body: str
+
+class CommentResponse(BaseModel):
+    comment_id: int
+    sender_nickname: str
+    body: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class LongTermProfileUpsert(BaseModel):
+    nickname: str
+    current_focus: str
+    desired_connections: str
+    profile_text: Optional[str] = None
+
+class LongTermProfileResponse(BaseModel):
+    profile_id: int
+    nickname: str
+    current_focus: str
+    desired_connections: str
+    profile_text: Optional[str] = None
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -88,6 +138,7 @@ class CheckinResponse(BaseModel):
     task_description: str
     is_active: bool
     reactions: List[ReactionResponse] = [] # 【追加】一緒にリアクションも返す
+    comments: List[CommentResponse] = []
 
     class Config:
         from_attributes = True
@@ -143,6 +194,58 @@ def add_reaction(checkin_id: int, reaction: ReactionCreate, db: Session = Depend
     db.commit()
     db.refresh(db_reaction)
     return db_reaction
+
+@app.post("/checkins/{checkin_id}/comments/", response_model=CommentResponse)
+def add_comment(checkin_id: int, comment: CommentCreate, db: Session = Depends(get_db)):
+    db_checkin = db.query(Checkin).filter(Checkin.checkin_id == checkin_id).first()
+    if not db_checkin:
+        raise HTTPException(status_code=404, detail="Checkin not found")
+
+    body = comment.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Comment body is required")
+
+    db_comment = Comment(checkin_id=checkin_id, sender_nickname=comment.sender_nickname, body=body)
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
+
+@app.get("/long-term-profiles/", response_model=List[LongTermProfileResponse])
+def get_long_term_profiles(db: Session = Depends(get_db)):
+    return db.query(LongTermProfile).order_by(LongTermProfile.updated_at.desc()).all()
+
+@app.get("/long-term-profiles/{nickname}", response_model=LongTermProfileResponse)
+def get_long_term_profile(nickname: str, db: Session = Depends(get_db)):
+    db_profile = db.query(LongTermProfile).filter(LongTermProfile.nickname == nickname).first()
+    if not db_profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return db_profile
+
+@app.post("/long-term-profiles/", response_model=LongTermProfileResponse)
+def upsert_long_term_profile(profile: LongTermProfileUpsert, db: Session = Depends(get_db)):
+    nickname = profile.nickname.strip()
+    if not nickname:
+        raise HTTPException(status_code=400, detail="Nickname is required")
+
+    db_profile = db.query(LongTermProfile).filter(LongTermProfile.nickname == nickname).first()
+    if db_profile:
+        db_profile.current_focus = profile.current_focus
+        db_profile.desired_connections = profile.desired_connections
+        db_profile.profile_text = profile.profile_text
+        db_profile.updated_at = datetime.utcnow()
+    else:
+        db_profile = LongTermProfile(
+            nickname=nickname,
+            current_focus=profile.current_focus,
+            desired_connections=profile.desired_connections,
+            profile_text=profile.profile_text,
+        )
+        db.add(db_profile)
+
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
 
 @app.post("/checkins/reset-all/")
 def reset_all_checkins(db: Session = Depends(get_db)):
