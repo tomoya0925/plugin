@@ -32,9 +32,9 @@ const SEAT_LAYOUT = [
   { seat: "17", x: 23, y: 10 }, { seat: "18", x: 23, y: 18 },
   { seat: "19", x: 23, y: 26 }, { seat: "20", x: 14, y: 26 },
   { seat: "21", x: 14, y: 18 }, { seat: "22", x: 14, y: 10 },
-  { seat: "23", x: 22, y: 42 }, { seat: "24", x: 22, y: 51 },
-  { seat: "25", x: 22, y: 60 }, { seat: "26", x: 11, y: 60 },
-  { seat: "27", x: 11, y: 51 }, { seat: "28", x: 11, y: 42 },
+  { seat: "23", x: 23, y: 42 }, { seat: "24", x: 23, y: 51 },
+  { seat: "25", x: 23, y: 60 }, { seat: "26", x: 14, y: 60 },
+  { seat: "27", x: 14, y: 51 }, { seat: "28", x: 14, y: 42 },
   { seat: "29", x: 36, y: 82 }, { seat: "30", x: 31, y: 82 },
   { seat: "31", x: 31, y: 91 }, { seat: "32", x: 36, y: 91 },
   { seat: "33", x: 23, y: 82 }, { seat: "34", x: 23, y: 91 },
@@ -464,16 +464,44 @@ function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onC
 
 function StoreMapView({ checkins }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
-  const [communicator, setCommunicator] = useState(localStorage.getItem("venture_store_communicator") || "");
+  const [communicators, setCommunicators] = useState(() => {
+    const savedList = localStorage.getItem("venture_store_communicators");
+    const oldSavedName = localStorage.getItem("venture_store_communicator");
+    if (savedList) {
+      try {
+        const parsedList = JSON.parse(savedList);
+        if (Array.isArray(parsedList) && parsedList.length > 0) return parsedList;
+      } catch {
+        return [oldSavedName || ""];
+      }
+    }
+    return [oldSavedName || ""];
+  });
   const activeCheckinsBySeat = checkins.reduce((acc, checkin) => {
     acc[normalizeSeatNumber(checkin.seat_number)] = checkin;
     return acc;
   }, {});
   const selectedCheckin = selectedSeat ? activeCheckinsBySeat[selectedSeat] : null;
 
-  const handleCommunicatorChange = (value) => {
-    setCommunicator(value);
-    localStorage.setItem("venture_store_communicator", value);
+  const saveCommunicators = (nextCommunicators) => {
+    setCommunicators(nextCommunicators);
+    localStorage.setItem("venture_store_communicators", JSON.stringify(nextCommunicators));
+  };
+
+  const handleCommunicatorChange = (index, value) => {
+    const nextCommunicators = communicators.map((name, currentIndex) => (
+      currentIndex === index ? value : name
+    ));
+    saveCommunicators(nextCommunicators);
+  };
+
+  const addCommunicator = () => {
+    saveCommunicators([...communicators, ""]);
+  };
+
+  const removeCommunicator = (index) => {
+    const nextCommunicators = communicators.filter((_, currentIndex) => currentIndex !== index);
+    saveCommunicators(nextCommunicators.length > 0 ? nextCommunicators : [""]);
   };
 
   return (
@@ -499,15 +527,36 @@ function StoreMapView({ checkins }) {
             <div className="absolute left-[39%] top-[42%] w-[39%] h-[20%] border-t-2 border-l-2 border-r-2 border-slate-300" />
             <div className="absolute right-[4%] top-[45%] w-[18%] h-[29%] border-t-2 border-r-2 border-slate-300 rounded-sm" />
             <div className="absolute left-[43%] top-[12%] w-[50%] h-[22%] border border-slate-300 rounded-sm" />
-            <div className="absolute left-[43%] top-[7%] text-[11px] font-bold text-slate-500">座席一覧</div>
-            <div className="absolute right-[6%] top-[7%] w-[26%] bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2">
-              <label className="block text-[11px] font-bold text-slate-500">今日のコミュニケーター</label>
-              <input
-                value={communicator}
-                onChange={(e) => handleCommunicatorChange(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-slate-200 text-sm font-bold outline-none focus:border-primary"
-                placeholder="名前を入力"
-              />
+            <div className="absolute right-[6%] top-[6%] w-[28%] bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-[11px] font-bold text-slate-500">今日のコミュニケーター</label>
+                <button
+                  onClick={addCommunicator}
+                  className="h-7 px-2 rounded-md bg-slate-900 text-white text-[11px] font-bold active:scale-95"
+                >
+                  追加
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                {communicators.map((name, index) => (
+                  <div key={index} className="flex gap-1.5">
+                    <input
+                      value={name}
+                      onChange={(e) => handleCommunicatorChange(index, e.target.value)}
+                      className="min-w-0 flex-1 h-8 px-2 rounded-md border border-slate-200 text-sm font-bold outline-none focus:border-primary"
+                      placeholder={`名前 ${index + 1}`}
+                    />
+                    {communicators.length > 1 && (
+                      <button
+                        onClick={() => removeCommunicator(index)}
+                        className="w-8 h-8 rounded-md bg-red-50 text-red-500 border border-red-100 text-[11px] font-bold active:scale-95"
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
               <a
                 href="https://canva.link/anzwwd3v1m3lmbf"
                 target="_blank"
@@ -518,11 +567,9 @@ function StoreMapView({ checkins }) {
               </a>
             </div>
             <div className="absolute left-[43%] top-[39%] right-[5%] border-t-4 border-slate-300" />
-            <div className="absolute left-[51%] bottom-[10%] w-[17%] h-[13%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">ドリンクサーバー</div>
-            <div className="absolute left-[38%] bottom-[8%] w-[9%] h-[18%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">STORAGE</div>
-            <div className="absolute right-[9%] bottom-[9%] w-[8%] h-[18%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">受付</div>
-            <div className="absolute right-[2%] bottom-[4%] text-xs font-bold text-slate-400">ENTRANCE</div>
-            <div className="absolute left-[29%] top-[50%] rotate-[-90deg] text-sm font-bold tracking-widest text-slate-400">WORKSHOP SPACE</div>
+            <div className="absolute left-[51%] bottom-[10%] w-[17%] h-[13%] border border-slate-300 rounded-sm" />
+            <div className="absolute left-[38%] bottom-[8%] w-[9%] h-[18%] border border-slate-300 rounded-sm" />
+            <div className="absolute right-[9%] bottom-[9%] w-[8%] h-[18%] border border-slate-300 rounded-sm" />
 
             {SEAT_LAYOUT.map(({ seat, x, y }) => {
               const checkin = activeCheckinsBySeat[seat];
