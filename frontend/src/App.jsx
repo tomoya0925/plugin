@@ -173,6 +173,24 @@ function App() {
       });
   };
 
+  const handleProfileDelete = () => {
+    if (!window.confirm("掲載内容を消去しますか？")) return;
+
+    fetch(`${API_BASE_URL}/long-term-profiles/${encodeURIComponent(currentUser)}`, {
+      method: "DELETE",
+    })
+      .then(() => {
+        setProfiles(prev => prev.filter(p => p.nickname !== currentUser));
+        setSelectedProfile(null);
+        setIsEditingProfile(false);
+        setProfileForm({
+          current_focus: "",
+          desired_connections: "",
+          profile_text: "",
+        });
+      });
+  };
+
   if (!currentUser) {
     return (
       <div className="bg-background min-h-screen flex items-center justify-center font-['Plus_Jakarta_Sans'] px-6">
@@ -248,6 +266,7 @@ function App() {
             setIsEditingProfile={setIsEditingProfile}
             setProfileForm={setProfileForm}
             onProfileSave={handleProfileSave}
+            onProfileDelete={handleProfileDelete}
           />
         )}
       </main>
@@ -421,6 +440,7 @@ function LongTermView({
   setIsEditingProfile,
   setProfileForm,
   onProfileSave,
+  onProfileDelete,
 }) {
   const myProfile = profiles.find(p => p.nickname === currentUser);
   const shouldShowProfileForm = !myProfile || isEditingProfile;
@@ -428,18 +448,26 @@ function LongTermView({
   return (
     <div className="space-y-6">
       <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-start justify-between gap-4">
+        <div className="space-y-3">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">中長期で頑張っていること</h2>
-            <p className="text-sm text-slate-500 mt-1">今のテーマと、ほしいつながりを掲載できます。</p>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 whitespace-nowrap">中長期で頑張っていること</h2>
+            <p className="text-sm text-slate-500 mt-1">今頑張っていることとほしいつながりを掲載できます。</p>
           </div>
           {myProfile && !isEditingProfile && (
-            <button
-              onClick={() => setIsEditingProfile(true)}
-              className="h-9 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold shrink-0 active:scale-95"
-            >
-              再入力する
-            </button>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIsEditingProfile(true)}
+                className="h-9 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold active:scale-95"
+              >
+                再入力する
+              </button>
+              <button
+                onClick={onProfileDelete}
+                className="h-9 px-3 rounded-lg bg-red-50 text-red-500 border border-red-100 text-xs font-bold active:scale-95"
+              >
+                消去
+              </button>
+            </div>
           )}
         </div>
 
