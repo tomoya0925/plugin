@@ -520,13 +520,6 @@ function StoreMapView({ checkins }) {
 
         <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 sm:p-5 overflow-x-auto">
           <div className="relative min-w-[980px] aspect-[16/9] bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
-            <div className="absolute inset-[3%] border-2 border-slate-300 rounded-sm" />
-            <div className="absolute left-[4%] top-[6%] w-[31%] h-[28%] border border-slate-300 rounded-sm" />
-            <div className="absolute left-[3%] top-[39%] w-[25%] h-[28%] border border-slate-300 rounded-sm" />
-            <div className="absolute left-[4%] bottom-[5%] w-[37%] h-[17%] border border-slate-300 rounded-sm" />
-            <div className="absolute left-[39%] top-[42%] w-[39%] h-[20%] border-t-2 border-l-2 border-r-2 border-slate-300" />
-            <div className="absolute right-[4%] top-[45%] w-[18%] h-[29%] border-t-2 border-r-2 border-slate-300 rounded-sm" />
-            <div className="absolute left-[43%] top-[12%] w-[50%] h-[22%] border border-slate-300 rounded-sm" />
             <div className="absolute right-[6%] top-[6%] w-[28%] bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <label className="block text-[11px] font-bold text-slate-500">今日のコミュニケーター</label>
@@ -566,10 +559,6 @@ function StoreMapView({ checkins }) {
                 Canvaを開く
               </a>
             </div>
-            <div className="absolute left-[43%] top-[39%] right-[5%] border-t-4 border-slate-300" />
-            <div className="absolute left-[51%] bottom-[10%] w-[17%] h-[13%] border border-slate-300 rounded-sm" />
-            <div className="absolute left-[38%] bottom-[8%] w-[9%] h-[18%] border border-slate-300 rounded-sm" />
-            <div className="absolute right-[9%] bottom-[9%] w-[8%] h-[18%] border border-slate-300 rounded-sm" />
 
             {SEAT_LAYOUT.map(({ seat, x, y }) => {
               const checkin = activeCheckinsBySeat[seat];
