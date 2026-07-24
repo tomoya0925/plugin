@@ -21,25 +21,25 @@ const AVATAR_LIST = {
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
 
 const SEAT_LAYOUT = [
-  { seat: "22", x: 11, y: 8 }, { seat: "17", x: 21, y: 9 },
-  { seat: "21", x: 11, y: 16 }, { seat: "18", x: 21, y: 17 },
-  { seat: "20", x: 11, y: 24 }, { seat: "19", x: 21, y: 25 },
-  { seat: "28", x: 9, y: 42 }, { seat: "23", x: 20, y: 43 },
-  { seat: "27", x: 8, y: 51 }, { seat: "24", x: 20, y: 52 },
-  { seat: "26", x: 8, y: 60 }, { seat: "25", x: 19, y: 60 },
-  { seat: "16", x: 35, y: 45 }, { seat: "13", x: 41, y: 45 },
-  { seat: "15", x: 35, y: 53 }, { seat: "14", x: 41, y: 54 },
-  { seat: "12", x: 50, y: 46 }, { seat: "09", x: 56, y: 47 },
-  { seat: "11", x: 50, y: 55 }, { seat: "10", x: 56, y: 56 },
-  { seat: "08", x: 64, y: 47 }, { seat: "05", x: 70, y: 47 },
-  { seat: "07", x: 64, y: 55 }, { seat: "06", x: 70, y: 56 },
-  { seat: "04", x: 79, y: 51 }, { seat: "03", x: 84, y: 52 },
-  { seat: "02", x: 93, y: 61 }, { seat: "01", x: 93, y: 70 },
-  { seat: "36", x: 7, y: 82 }, { seat: "35", x: 12, y: 82 },
-  { seat: "33", x: 23, y: 82 }, { seat: "30", x: 31, y: 83 },
-  { seat: "29", x: 36, y: 83 }, { seat: "38", x: 7, y: 92 },
-  { seat: "37", x: 12, y: 92 }, { seat: "34", x: 23, y: 92 },
-  { seat: "31", x: 31, y: 92 }, { seat: "32", x: 36, y: 92 },
+  { seat: "01", x: 92, y: 69 }, { seat: "02", x: 92, y: 59 },
+  { seat: "03", x: 84, y: 52 }, { seat: "04", x: 78, y: 52 },
+  { seat: "05", x: 69, y: 46 }, { seat: "06", x: 69, y: 56 },
+  { seat: "07", x: 63, y: 56 }, { seat: "08", x: 63, y: 46 },
+  { seat: "09", x: 56, y: 46 }, { seat: "10", x: 56, y: 56 },
+  { seat: "11", x: 50, y: 56 }, { seat: "12", x: 50, y: 46 },
+  { seat: "13", x: 43, y: 46 }, { seat: "14", x: 43, y: 56 },
+  { seat: "15", x: 37, y: 56 }, { seat: "16", x: 37, y: 46 },
+  { seat: "17", x: 23, y: 10 }, { seat: "18", x: 23, y: 18 },
+  { seat: "19", x: 23, y: 26 }, { seat: "20", x: 14, y: 26 },
+  { seat: "21", x: 14, y: 18 }, { seat: "22", x: 14, y: 10 },
+  { seat: "23", x: 22, y: 42 }, { seat: "24", x: 22, y: 51 },
+  { seat: "25", x: 22, y: 60 }, { seat: "26", x: 11, y: 60 },
+  { seat: "27", x: 11, y: 51 }, { seat: "28", x: 11, y: 42 },
+  { seat: "29", x: 36, y: 82 }, { seat: "30", x: 31, y: 82 },
+  { seat: "31", x: 31, y: 91 }, { seat: "32", x: 36, y: 91 },
+  { seat: "33", x: 23, y: 82 }, { seat: "34", x: 23, y: 91 },
+  { seat: "35", x: 13, y: 82 }, { seat: "36", x: 8, y: 82 },
+  { seat: "37", x: 13, y: 91 }, { seat: "38", x: 8, y: 91 },
 ];
 
 const normalizeSeatNumber = (seatNumber) => {
@@ -464,11 +464,17 @@ function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onC
 
 function StoreMapView({ checkins }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
+  const [communicator, setCommunicator] = useState(localStorage.getItem("venture_store_communicator") || "");
   const activeCheckinsBySeat = checkins.reduce((acc, checkin) => {
     acc[normalizeSeatNumber(checkin.seat_number)] = checkin;
     return acc;
   }, {});
   const selectedCheckin = selectedSeat ? activeCheckinsBySeat[selectedSeat] : null;
+
+  const handleCommunicatorChange = (value) => {
+    setCommunicator(value);
+    localStorage.setItem("venture_store_communicator", value);
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-4 sm:p-6 font-['Plus_Jakarta_Sans']">
@@ -494,6 +500,23 @@ function StoreMapView({ checkins }) {
             <div className="absolute right-[4%] top-[45%] w-[18%] h-[29%] border-t-2 border-r-2 border-slate-300 rounded-sm" />
             <div className="absolute left-[43%] top-[12%] w-[50%] h-[22%] border border-slate-300 rounded-sm" />
             <div className="absolute left-[43%] top-[7%] text-[11px] font-bold text-slate-500">座席一覧</div>
+            <div className="absolute right-[6%] top-[7%] w-[26%] bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2">
+              <label className="block text-[11px] font-bold text-slate-500">今日のコミュニケーター</label>
+              <input
+                value={communicator}
+                onChange={(e) => handleCommunicatorChange(e.target.value)}
+                className="w-full h-9 px-3 rounded-md border border-slate-200 text-sm font-bold outline-none focus:border-primary"
+                placeholder="名前を入力"
+              />
+              <a
+                href="https://canva.link/anzwwd3v1m3lmbf"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center h-9 rounded-md bg-primary text-white text-xs font-bold active:scale-95"
+              >
+                Canvaを開く
+              </a>
+            </div>
             <div className="absolute left-[43%] top-[39%] right-[5%] border-t-4 border-slate-300" />
             <div className="absolute left-[51%] bottom-[10%] w-[17%] h-[13%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">ドリンクサーバー</div>
             <div className="absolute left-[38%] bottom-[8%] w-[9%] h-[18%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">STORAGE</div>
