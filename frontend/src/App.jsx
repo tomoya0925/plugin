@@ -20,7 +20,35 @@ const AVATAR_LIST = {
 
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
 
+const SEAT_LAYOUT = [
+  { seat: "22", x: 11, y: 8 }, { seat: "17", x: 21, y: 9 },
+  { seat: "21", x: 11, y: 16 }, { seat: "18", x: 21, y: 17 },
+  { seat: "20", x: 11, y: 24 }, { seat: "19", x: 21, y: 25 },
+  { seat: "28", x: 9, y: 42 }, { seat: "23", x: 20, y: 43 },
+  { seat: "27", x: 8, y: 51 }, { seat: "24", x: 20, y: 52 },
+  { seat: "26", x: 8, y: 60 }, { seat: "25", x: 19, y: 60 },
+  { seat: "16", x: 35, y: 45 }, { seat: "13", x: 41, y: 45 },
+  { seat: "15", x: 35, y: 53 }, { seat: "14", x: 41, y: 54 },
+  { seat: "12", x: 50, y: 46 }, { seat: "09", x: 56, y: 47 },
+  { seat: "11", x: 50, y: 55 }, { seat: "10", x: 56, y: 56 },
+  { seat: "08", x: 64, y: 47 }, { seat: "05", x: 70, y: 47 },
+  { seat: "07", x: 64, y: 55 }, { seat: "06", x: 70, y: 56 },
+  { seat: "04", x: 79, y: 51 }, { seat: "03", x: 84, y: 52 },
+  { seat: "02", x: 93, y: 61 }, { seat: "01", x: 93, y: 70 },
+  { seat: "36", x: 7, y: 82 }, { seat: "35", x: 12, y: 82 },
+  { seat: "33", x: 23, y: 82 }, { seat: "30", x: 31, y: 83 },
+  { seat: "29", x: 36, y: 83 }, { seat: "38", x: 7, y: 92 },
+  { seat: "37", x: 12, y: 92 }, { seat: "34", x: 23, y: 92 },
+  { seat: "31", x: 31, y: 92 }, { seat: "32", x: 36, y: 92 },
+];
+
+const normalizeSeatNumber = (seatNumber) => {
+  const digits = String(seatNumber || "").match(/\d+/)?.[0];
+  return digits ? digits.padStart(2, "0") : String(seatNumber || "").trim();
+};
+
 function App() {
+  const isStoreMapView = new URLSearchParams(window.location.search).get("view") === "store-map";
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("venture_currentUser") || "");
   const [loginInput, setLoginInput] = useState("");
   const [checkins, setCheckins] = useState([]);
@@ -65,10 +93,10 @@ function App() {
 
   useEffect(() => {
     fetchCheckins();
-    fetchProfiles();
+    if (!isStoreMapView) fetchProfiles();
     const timer = setInterval(fetchCheckins, 30000);
     return () => clearInterval(timer);
-  }, [fetchCheckins, fetchProfiles]);
+  }, [fetchCheckins, fetchProfiles, isStoreMapView]);
 
   const handleLogin = (e) => {
     if (e) e.preventDefault();
@@ -190,6 +218,10 @@ function App() {
         });
       });
   };
+
+  if (isStoreMapView) {
+    return <StoreMapView checkins={checkins} />;
+  }
 
   if (!currentUser) {
     return (
@@ -426,6 +458,105 @@ function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onC
           <button type="submit" className="w-16 h-10 bg-slate-900 text-white rounded-lg text-xs font-bold active:scale-95">送信</button>
         </form>
       </div>
+    </div>
+  );
+}
+
+function StoreMapView({ checkins }) {
+  const [selectedSeat, setSelectedSeat] = useState(null);
+  const activeCheckinsBySeat = checkins.reduce((acc, checkin) => {
+    acc[normalizeSeatNumber(checkin.seat_number)] = checkin;
+    return acc;
+  }, {});
+  const selectedCheckin = selectedSeat ? activeCheckinsBySeat[selectedSeat] : null;
+
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-900 p-4 sm:p-6 font-['Plus_Jakarta_Sans']">
+      <main className="max-w-[1180px] mx-auto space-y-4">
+        <header className="bg-white border border-slate-200 rounded-xl px-5 py-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">店舗 座席マップ</h1>
+            <p className="text-sm text-slate-500 mt-1">座席番号をタップすると、その人が今日取り組んでいることを確認できます。</p>
+          </div>
+          <div className="flex gap-2 text-xs font-bold">
+            <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary">{checkins.length}名が活動中</span>
+            <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-500">30秒ごとに更新</span>
+          </div>
+        </header>
+
+        <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 sm:p-5 overflow-x-auto">
+          <div className="relative min-w-[980px] aspect-[16/9] bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+            <div className="absolute inset-[3%] border-2 border-slate-300 rounded-sm" />
+            <div className="absolute left-[4%] top-[6%] w-[31%] h-[28%] border border-slate-300 rounded-sm" />
+            <div className="absolute left-[3%] top-[39%] w-[25%] h-[28%] border border-slate-300 rounded-sm" />
+            <div className="absolute left-[4%] bottom-[5%] w-[37%] h-[17%] border border-slate-300 rounded-sm" />
+            <div className="absolute left-[39%] top-[42%] w-[39%] h-[20%] border-t-2 border-l-2 border-r-2 border-slate-300" />
+            <div className="absolute right-[4%] top-[45%] w-[18%] h-[29%] border-t-2 border-r-2 border-slate-300 rounded-sm" />
+            <div className="absolute left-[43%] top-[12%] w-[50%] h-[22%] border border-slate-300 rounded-sm" />
+            <div className="absolute left-[43%] top-[7%] text-[11px] font-bold text-slate-500">座席一覧</div>
+            <div className="absolute left-[43%] top-[39%] right-[5%] border-t-4 border-slate-300" />
+            <div className="absolute left-[51%] bottom-[10%] w-[17%] h-[13%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">ドリンクサーバー</div>
+            <div className="absolute left-[38%] bottom-[8%] w-[9%] h-[18%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">STORAGE</div>
+            <div className="absolute right-[9%] bottom-[9%] w-[8%] h-[18%] border border-slate-300 rounded-sm flex items-center justify-center text-xs font-bold text-slate-400">受付</div>
+            <div className="absolute right-[2%] bottom-[4%] text-xs font-bold text-slate-400">ENTRANCE</div>
+            <div className="absolute left-[29%] top-[50%] rotate-[-90deg] text-sm font-bold tracking-widest text-slate-400">WORKSHOP SPACE</div>
+
+            {SEAT_LAYOUT.map(({ seat, x, y }) => {
+              const checkin = activeCheckinsBySeat[seat];
+              const isSelected = selectedSeat === seat;
+              return (
+                <button
+                  key={seat}
+                  onClick={() => setSelectedSeat(seat)}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full border-2 text-sm font-bold shadow-sm transition-all ${
+                    checkin
+                      ? "bg-primary text-white border-primary shadow-primary/30"
+                      : "bg-white text-slate-500 border-rose-200"
+                  } ${isSelected ? "ring-4 ring-slate-900/20 scale-110" : "active:scale-95"}`}
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                  title={`${seat}${checkin ? ` ${checkin.nickname}` : ""}`}
+                >
+                  {seat}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 min-h-[150px]">
+          {selectedSeat ? (
+            selectedCheckin ? (
+              <div className="flex gap-4">
+                <img src={AVATAR_LIST[selectedCheckin.avatar_id] || AVATAR_LIST.cat} className="w-16 h-16 rounded-full shrink-0" alt="avatar" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded-full">席 {selectedSeat}</span>
+                    <h2 className="text-xl font-bold truncate">{selectedCheckin.nickname}</h2>
+                  </div>
+                  <p className="text-sm text-slate-500 mt-3">今日頑張ること</p>
+                  <p className="text-lg font-bold text-slate-800 mt-1 break-words">{selectedCheckin.task_description}</p>
+                  {(selectedCheckin.comments || []).length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {selectedCheckin.comments.map((comment) => (
+                        <span key={comment.comment_id} className="text-xs bg-slate-50 border border-slate-100 rounded-full px-3 py-1 text-slate-600">
+                          {comment.sender_nickname}: {comment.body}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full inline-block">席 {selectedSeat}</div>
+                <p className="text-slate-500 mt-3">この席は現在チェックインされていません。</p>
+              </div>
+            )
+          ) : (
+            <p className="text-slate-500">座席番号をタップすると詳細が表示されます。</p>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
