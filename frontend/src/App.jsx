@@ -110,13 +110,11 @@ function App() {
 
   useEffect(() => {
     fetchCheckins();
-    if (!isStoreMapView) {
-      fetchProfiles();
-      fetchJobInfos();
-    }
+    fetchProfiles();
+    fetchJobInfos();
     const timer = setInterval(fetchCheckins, 30000);
     return () => clearInterval(timer);
-  }, [fetchCheckins, fetchProfiles, fetchJobInfos, isStoreMapView]);
+  }, [fetchCheckins, fetchProfiles, fetchJobInfos]);
 
   const handleLogin = (e) => {
     if (e) e.preventDefault();
@@ -288,7 +286,7 @@ function App() {
   };
 
   if (isStoreMapView) {
-    return <StoreMapView checkins={checkins} />;
+    return <StoreMapView checkins={checkins} profiles={profiles} jobInfos={jobInfos} />;
   }
 
   if (!currentUser) {
@@ -543,8 +541,12 @@ function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onC
   );
 }
 
-function StoreMapView({ checkins }) {
+function StoreMapView({ checkins, profiles, jobInfos }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
+  const [storeTab, setStoreTab] = useState("seats");
+  const [storeLongTermQuery, setStoreLongTermQuery] = useState("");
+  const [storeJobQuery, setStoreJobQuery] = useState("");
+  const [selectedJobInfo, setSelectedJobInfo] = useState(null);
   const [communicators, setCommunicators] = useState(() => {
     const savedList = localStorage.getItem("venture_store_communicators");
     const oldSavedName = localStorage.getItem("venture_store_communicator");
@@ -599,6 +601,19 @@ function StoreMapView({ checkins }) {
           </div>
         </header>
 
+        <div className="grid grid-cols-3 gap-2 bg-slate-200 p-1 rounded-xl border border-slate-300">
+          <button onClick={() => setStoreTab("seats")} className={`h-11 rounded-lg text-sm font-bold ${storeTab === "seats" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+            座席
+          </button>
+          <button onClick={() => setStoreTab("longTerm")} className={`h-11 rounded-lg text-sm font-bold ${storeTab === "longTerm" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+            中長期
+          </button>
+          <button onClick={() => setStoreTab("jobInfo")} className={`h-11 rounded-lg text-sm font-bold ${storeTab === "jobInfo" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+            就活情報
+          </button>
+        </div>
+
+        {storeTab === "seats" ? (
         <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 sm:p-5 overflow-x-auto">
           <div className="relative min-w-[980px] aspect-[16/9] bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
             <div className="absolute right-[6%] top-[6%] w-[28%] bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2">
@@ -696,8 +711,157 @@ function StoreMapView({ checkins }) {
             })}
           </div>
         </section>
+        ) : storeTab === "longTerm" ? (
+          <StoreLongTermBoard
+            profiles={profiles}
+            query={storeLongTermQuery}
+            setQuery={setStoreLongTermQuery}
+          />
+        ) : (
+          <StoreJobInfoBubbles
+            jobInfos={jobInfos}
+            query={storeJobQuery}
+            setQuery={setStoreJobQuery}
+            selectedJobInfo={selectedJobInfo}
+            setSelectedJobInfo={setSelectedJobInfo}
+          />
+        )}
       </main>
     </div>
+  );
+}
+
+function StoreLongTermBoard({ profiles, query, setQuery }) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredProfiles = profiles.filter((profile) => {
+    const targetText = [
+      profile.nickname,
+      profile.current_focus,
+      profile.desired_connections,
+      profile.profile_text,
+    ].join(" ").toLowerCase();
+    return !normalizedQuery || targetText.includes(normalizedQuery);
+  });
+
+  return (
+    <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-5">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold text-primary">CREW WANTED</p>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900 mt-1">中長期チャレンジ掲示板</h2>
+          <p className="text-sm text-slate-500 mt-2">頑張っていることと、ほしいつながりを探せます。</p>
+        </div>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full md:w-[340px] h-12 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold outline-none focus:border-primary"
+          placeholder="ワード検索"
+        />
+      </div>
+
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filteredProfiles.map((profile) => (
+          <article key={profile.profile_id} className="border-2 border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+            <div className="bg-primary/10 px-4 py-3 border-b border-slate-200">
+              <div className="text-xs font-bold text-primary">掲載メンバー</div>
+              <h3 className="text-2xl font-black text-slate-900 mt-1 break-words">{profile.nickname}</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <div className="text-xs font-bold text-slate-500">今頑張っていること</div>
+                <p className="text-base font-bold text-slate-800 mt-1 break-words">{profile.current_focus}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                <div className="text-xs font-bold text-slate-500">ほしいつながり</div>
+                <p className="text-sm font-bold text-primary mt-1 break-words">{profile.desired_connections}</p>
+              </div>
+              {profile.profile_text && (
+                <p className="text-sm text-slate-600 leading-6 whitespace-pre-wrap break-words">{profile.profile_text}</p>
+              )}
+            </div>
+          </article>
+        ))}
+        {filteredProfiles.length === 0 && (
+          <div className="md:col-span-2 xl:col-span-3 text-center text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-10">
+            該当する掲載がありません。
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function StoreJobInfoBubbles({ jobInfos, query, setQuery, selectedJobInfo, setSelectedJobInfo }) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredJobInfos = jobInfos.filter((jobInfo) => (
+    !normalizedQuery || String(jobInfo.company_name || "").toLowerCase().includes(normalizedQuery)
+  ));
+
+  return (
+    <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-5">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold text-primary">CAREER BUBBLES</p>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900 mt-1">就活情報</h2>
+          <p className="text-sm text-slate-500 mt-2">企業名で検索して、シャボン玉をタップすると詳細を確認できます。</p>
+        </div>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full md:w-[340px] h-12 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold outline-none focus:border-primary"
+          placeholder="企業名検索"
+        />
+      </div>
+
+      <div className="relative min-h-[430px] rounded-xl bg-gradient-to-br from-cyan-50 via-white to-emerald-50 border border-slate-100 overflow-hidden p-6">
+        <div className="flex flex-wrap gap-5 items-center justify-center">
+          {filteredJobInfos.map((jobInfo, index) => (
+            <button
+              key={jobInfo.job_info_id}
+              onClick={() => setSelectedJobInfo(jobInfo)}
+              className={`rounded-full border border-white/80 bg-white/70 backdrop-blur-sm shadow-lg text-center active:scale-95 transition-all flex flex-col items-center justify-center p-4 ${
+                index % 3 === 0 ? "w-36 h-36" : index % 3 === 1 ? "w-44 h-44" : "w-32 h-32"
+              }`}
+            >
+              <span className="text-[11px] font-bold text-primary">{jobInfo.selection_type}</span>
+              <span className="text-base font-black text-slate-900 mt-1 break-words">{jobInfo.company_name}</span>
+              <span className="text-xs text-slate-500 mt-1 break-words">{jobInfo.role}</span>
+            </button>
+          ))}
+          {filteredJobInfos.length === 0 && (
+            <div className="text-center text-slate-500 bg-white/80 border border-slate-100 rounded-lg p-10">
+              該当する就活情報がありません。
+            </div>
+          )}
+        </div>
+      </div>
+
+      {selectedJobInfo && (
+        <article className="bg-slate-900 text-white rounded-xl p-5 shadow-sm space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-bold text-primary">{selectedJobInfo.selection_type} / {selectedJobInfo.start_period}〜{selectedJobInfo.end_period}</div>
+              <h3 className="text-2xl font-black mt-1 break-words">{selectedJobInfo.company_name}</h3>
+              <p className="text-sm text-slate-300 mt-1 break-words">{selectedJobInfo.role}</p>
+            </div>
+            <button onClick={() => setSelectedJobInfo(null)} className="h-9 px-3 rounded-lg bg-white/10 text-xs font-bold">
+              閉じる
+            </button>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <div className="bg-white/10 rounded-lg p-4">
+              <div className="text-xs font-bold text-slate-300">選考の特徴</div>
+              <p className="text-sm mt-2 leading-6 whitespace-pre-wrap break-words">{selectedJobInfo.selection_features}</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-4">
+              <div className="text-xs font-bold text-slate-300">企業の特徴</div>
+              <p className="text-sm mt-2 leading-6 whitespace-pre-wrap break-words">{selectedJobInfo.company_impression}</p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400 font-bold">投稿者: {selectedJobInfo.submitter_nickname}</p>
+        </article>
+      )}
+    </section>
   );
 }
 
