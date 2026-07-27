@@ -53,9 +53,11 @@ function App() {
   const [loginInput, setLoginInput] = useState("");
   const [checkins, setCheckins] = useState([]);
   const [profiles, setProfiles] = useState([]);
+  const [jobInfos, setJobInfos] = useState([]);
   const [activeTab, setActiveTab] = useState("today");
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [avatarId, setAvatarId] = useState("cat");
   const [seat, setSeat] = useState("");
   const [task, setTask] = useState("");
@@ -64,6 +66,15 @@ function App() {
     current_focus: "",
     desired_connections: "",
     profile_text: "",
+  });
+  const [jobForm, setJobForm] = useState({
+    company_name: "",
+    role: "",
+    selection_type: "本選考",
+    start_period: "",
+    end_period: "",
+    selection_features: "",
+    company_impression: "",
   });
 
   const myCheckin = checkins.find(c => c.nickname === currentUser);
@@ -91,12 +102,21 @@ function App() {
       });
   }, [currentUser]);
 
+  const fetchJobInfos = useCallback(() => {
+    fetch(`${API_BASE_URL}/job-infos/`)
+      .then(res => res.json())
+      .then(data => setJobInfos(Array.isArray(data) ? data : []));
+  }, []);
+
   useEffect(() => {
     fetchCheckins();
-    if (!isStoreMapView) fetchProfiles();
+    if (!isStoreMapView) {
+      fetchProfiles();
+      fetchJobInfos();
+    }
     const timer = setInterval(fetchCheckins, 30000);
     return () => clearInterval(timer);
-  }, [fetchCheckins, fetchProfiles, isStoreMapView]);
+  }, [fetchCheckins, fetchProfiles, fetchJobInfos, isStoreMapView]);
 
   const handleLogin = (e) => {
     if (e) e.preventDefault();
@@ -219,6 +239,54 @@ function App() {
       });
   };
 
+  const handleJobInfoSave = (e) => {
+    e.preventDefault();
+    fetch(`${API_BASE_URL}/job-infos/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        submitter_nickname: currentUser,
+        ...jobForm,
+      }),
+    })
+      .then(res => res.json())
+      .then(savedJobInfo => {
+        setJobInfos(prev => [savedJobInfo, ...prev]);
+        setJobForm({
+          company_name: "",
+          role: "",
+          selection_type: "本選考",
+          start_period: "",
+          end_period: "",
+          selection_features: "",
+          company_impression: "",
+        });
+        setIsJobFormOpen(false);
+      });
+  };
+
+  const handleJobInfoDelete = (jobInfo) => {
+    const isOwner = jobInfo.submitter_nickname === currentUser;
+    let adminKey = "";
+    if (!isOwner) {
+      adminKey = window.prompt("管理用キーを入力してください") || "";
+      if (!adminKey) return;
+    }
+    if (!window.confirm("この就活情報を削除しますか？")) return;
+
+    const params = new URLSearchParams({ requester_nickname: currentUser });
+    if (adminKey) params.set("admin_key", adminKey);
+
+    fetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
+      method: "DELETE",
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("delete failed");
+        setJobInfos(prev => prev.filter(info => info.job_info_id !== jobInfo.job_info_id));
+      })
+      .catch(() => window.alert("削除できませんでした"));
+  };
+
   if (isStoreMapView) {
     return <StoreMapView checkins={checkins} />;
   }
@@ -260,12 +328,15 @@ function App() {
       </header>
 
       <main className="pt-24 px-4 max-w-[720px] mx-auto space-y-8">
-        <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button onClick={() => setActiveTab("today")} className={`h-10 rounded-lg text-sm font-bold ${activeTab === "today" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
             今日
           </button>
           <button onClick={() => setActiveTab("longTerm")} className={`h-10 rounded-lg text-sm font-bold ${activeTab === "longTerm" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
             中長期
+          </button>
+          <button onClick={() => setActiveTab("jobInfo")} className={`h-10 rounded-lg text-sm font-bold ${activeTab === "jobInfo" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+            就活情報
           </button>
         </div>
 
@@ -287,7 +358,7 @@ function App() {
             onReaction={handleReaction}
             onComment={handleComment}
           />
-        ) : (
+        ) : activeTab === "longTerm" ? (
           <LongTermView
             currentUser={currentUser}
             profiles={profiles}
@@ -299,6 +370,16 @@ function App() {
             setProfileForm={setProfileForm}
             onProfileSave={handleProfileSave}
             onProfileDelete={handleProfileDelete}
+          />
+        ) : (
+          <JobInfoView
+            jobInfos={jobInfos}
+            jobForm={jobForm}
+            isJobFormOpen={isJobFormOpen}
+            setJobForm={setJobForm}
+            setIsJobFormOpen={setIsJobFormOpen}
+            onJobInfoSave={handleJobInfoSave}
+            onJobInfoDelete={handleJobInfoDelete}
           />
         )}
       </main>
@@ -736,6 +817,152 @@ function LongTermView({
           {profiles.length === 0 && (
             <div className="bg-white rounded-xl p-6 border border-slate-200 text-center text-sm text-slate-500">
               まだ掲載がありません。
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function JobInfoView({
+  jobInfos,
+  jobForm,
+  isJobFormOpen,
+  setJobForm,
+  setIsJobFormOpen,
+  onJobInfoSave,
+  onJobInfoDelete,
+}) {
+  return (
+    <div className="space-y-6">
+      <section className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-slate-900">就活情報</h2>
+            <p className="text-sm text-slate-500 mt-1">クルーが受けた企業や選考の情報を共有できます。</p>
+          </div>
+          <button
+            onClick={() => setIsJobFormOpen(prev => !prev)}
+            className="h-10 px-4 rounded-lg bg-primary text-white text-sm font-bold shrink-0 active:scale-95"
+          >
+            {isJobFormOpen ? "閉じる" : "登録する"}
+          </button>
+        </div>
+
+        {isJobFormOpen && (
+          <form onSubmit={onJobInfoSave} className="space-y-4 pt-2">
+            <input
+              value={jobForm.company_name}
+              onChange={(e) => setJobForm(prev => ({ ...prev, company_name: e.target.value }))}
+              required
+              maxLength={120}
+              className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+              placeholder="企業名"
+            />
+            <input
+              value={jobForm.role}
+              onChange={(e) => setJobForm(prev => ({ ...prev, role: e.target.value }))}
+              required
+              maxLength={120}
+              className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+              placeholder="受けた職種"
+            />
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+              {["本選考", "インターン"].map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setJobForm(prev => ({ ...prev, selection_type: type }))}
+                  className={`h-10 rounded-md text-sm font-bold ${jobForm.selection_type === type ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                value={jobForm.start_period}
+                onChange={(e) => setJobForm(prev => ({ ...prev, start_period: e.target.value }))}
+                required
+                maxLength={50}
+                className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+                placeholder="開始時期"
+              />
+              <input
+                value={jobForm.end_period}
+                onChange={(e) => setJobForm(prev => ({ ...prev, end_period: e.target.value }))}
+                required
+                maxLength={50}
+                className="w-full h-[48px] px-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+                placeholder="終了時期"
+              />
+            </div>
+            <textarea
+              value={jobForm.selection_features}
+              onChange={(e) => setJobForm(prev => ({ ...prev, selection_features: e.target.value }))}
+              required
+              maxLength={1000}
+              className="w-full p-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+              placeholder="選考の特徴"
+              rows="4"
+            />
+            <textarea
+              value={jobForm.company_impression}
+              onChange={(e) => setJobForm(prev => ({ ...prev, company_impression: e.target.value }))}
+              required
+              maxLength={1000}
+              className="w-full p-4 rounded-lg border border-slate-200 outline-none focus:border-primary"
+              placeholder="選考やインターンを通じて感じたその企業の特徴"
+              rows="4"
+            />
+            <button type="submit" className="w-full h-12 bg-slate-900 text-white font-bold rounded-lg shadow-md active:scale-95">
+              投稿する
+            </button>
+          </form>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900">企業情報一覧</h2>
+          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">{jobInfos.length}件</span>
+        </div>
+        <div className="space-y-4">
+          {jobInfos.map((jobInfo) => (
+            <article key={jobInfo.job_info_id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-[11px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-full">{jobInfo.selection_type}</span>
+                    <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">{jobInfo.start_period}〜{jobInfo.end_period}</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mt-2 break-words">{jobInfo.company_name}</h3>
+                  <p className="text-sm text-slate-600 mt-1 break-words">{jobInfo.role}</p>
+                </div>
+                <button
+                  onClick={() => onJobInfoDelete(jobInfo)}
+                  className="h-8 px-3 rounded-lg bg-red-50 text-red-500 border border-red-100 text-xs font-bold shrink-0 active:scale-95"
+                >
+                  削除
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="text-xs font-bold text-slate-500">選考の特徴</div>
+                  <p className="text-sm text-slate-700 mt-1 whitespace-pre-wrap break-words">{jobInfo.selection_features}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="text-xs font-bold text-slate-500">企業の特徴</div>
+                  <p className="text-sm text-slate-700 mt-1 whitespace-pre-wrap break-words">{jobInfo.company_impression}</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 font-bold">投稿者: {jobInfo.submitter_nickname}</p>
+            </article>
+          ))}
+          {jobInfos.length === 0 && (
+            <div className="bg-white rounded-xl p-6 border border-slate-200 text-center text-sm text-slate-500">
+              まだ就活情報がありません。
             </div>
           )}
         </div>
