@@ -560,6 +560,40 @@ function StoreMapView({ checkins }) {
               </a>
             </div>
 
+            <div className="absolute left-[43%] top-[66%] w-[35%] min-h-[132px] bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+              {selectedSeat ? (
+                selectedCheckin ? (
+                  <div className="flex gap-3">
+                    <img src={AVATAR_LIST[selectedCheckin.avatar_id] || AVATAR_LIST.cat} className="w-12 h-12 rounded-full shrink-0" alt="avatar" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-full">席 {selectedSeat}</span>
+                        <h2 className="text-lg font-bold truncate">{selectedCheckin.nickname}</h2>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">今日頑張ること</p>
+                      <p className="text-sm font-bold text-slate-800 mt-1 break-words">{selectedCheckin.task_description}</p>
+                      {(selectedCheckin.comments || []).length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {selectedCheckin.comments.slice(0, 3).map((comment) => (
+                            <span key={comment.comment_id} className="text-[10px] bg-slate-50 border border-slate-100 rounded-full px-2 py-1 text-slate-600">
+                              {comment.sender_nickname}: {comment.body}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full inline-block">席 {selectedSeat}</div>
+                    <p className="text-sm text-slate-500 mt-3">この席は現在チェックインされていません。</p>
+                  </div>
+                )
+              ) : (
+                <p className="text-sm text-slate-500">座席番号をタップすると詳細が表示されます。</p>
+              )}
+            </div>
+
             {SEAT_LAYOUT.map(({ seat, x, y }) => {
               const checkin = activeCheckinsBySeat[seat];
               const isSelected = selectedSeat === seat;
@@ -580,40 +614,6 @@ function StoreMapView({ checkins }) {
               );
             })}
           </div>
-        </section>
-
-        <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 min-h-[150px]">
-          {selectedSeat ? (
-            selectedCheckin ? (
-              <div className="flex gap-4">
-                <img src={AVATAR_LIST[selectedCheckin.avatar_id] || AVATAR_LIST.cat} className="w-16 h-16 rounded-full shrink-0" alt="avatar" />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded-full">席 {selectedSeat}</span>
-                    <h2 className="text-xl font-bold truncate">{selectedCheckin.nickname}</h2>
-                  </div>
-                  <p className="text-sm text-slate-500 mt-3">今日頑張ること</p>
-                  <p className="text-lg font-bold text-slate-800 mt-1 break-words">{selectedCheckin.task_description}</p>
-                  {(selectedCheckin.comments || []).length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {selectedCheckin.comments.map((comment) => (
-                        <span key={comment.comment_id} className="text-xs bg-slate-50 border border-slate-100 rounded-full px-3 py-1 text-slate-600">
-                          {comment.sender_nickname}: {comment.body}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full inline-block">席 {selectedSeat}</div>
-                <p className="text-slate-500 mt-3">この席は現在チェックインされていません。</p>
-              </div>
-            )
-          ) : (
-            <p className="text-slate-500">座席番号をタップすると詳細が表示されます。</p>
-          )}
         </section>
       </main>
     </div>
