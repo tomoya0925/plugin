@@ -54,6 +54,7 @@ function App() {
   const [checkins, setCheckins] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [jobInfos, setJobInfos] = useState([]);
+  const [jobInfoError, setJobInfoError] = useState("");
   const [activeTab, setActiveTab] = useState("today");
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -104,8 +105,18 @@ function App() {
 
   const fetchJobInfos = useCallback(() => {
     fetch(`${API_BASE_URL}/job-infos/`)
-      .then(res => res.json())
-      .then(data => setJobInfos(Array.isArray(data) ? data : []));
+      .then(res => {
+        if (!res.ok) throw new Error("job info fetch failed");
+        return res.json();
+      })
+      .then(data => {
+        setJobInfos(Array.isArray(data) ? data : []);
+        setJobInfoError("");
+      })
+      .catch(() => {
+        setJobInfos([]);
+        setJobInfoError("就活情報を読み込めませんでした。バックエンドの反映状況を確認してください。");
+      });
   }, []);
 
   useEffect(() => {
@@ -247,9 +258,13 @@ function App() {
         ...jobForm,
       }),
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error("job info save failed");
+        return res.json();
+      })
       .then(savedJobInfo => {
         setJobInfos(prev => [savedJobInfo, ...prev]);
+        setJobInfoError("");
         setJobForm({
           company_name: "",
           role: "",
@@ -260,7 +275,8 @@ function App() {
           company_impression: "",
         });
         setIsJobFormOpen(false);
-      });
+      })
+      .catch(() => window.alert("就活情報を登録できませんでした。少し時間をおいて再度試してください。"));
   };
 
   const handleJobInfoDelete = (jobInfo) => {
@@ -285,8 +301,34 @@ function App() {
       .catch(() => window.alert("削除できませんでした"));
   };
 
+  const handleStoreJobInfoDelete = (jobInfo) => {
+    if (!window.confirm("店舗iPadからこの就活情報を削除しますか？")) return;
+
+    const params = new URLSearchParams({
+      requester_nickname: "store-ipad",
+      store_delete: "true",
+    });
+
+    fetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
+      method: "DELETE",
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("store delete failed");
+        setJobInfos(prev => prev.filter(info => info.job_info_id !== jobInfo.job_info_id));
+      })
+      .catch(() => window.alert("削除できませんでした"));
+  };
+
   if (isStoreMapView) {
-    return <StoreMapView checkins={checkins} profiles={profiles} jobInfos={jobInfos} />;
+    return (
+      <StoreMapView
+        checkins={checkins}
+        profiles={profiles}
+        jobInfos={jobInfos}
+        jobInfoError={jobInfoError}
+        onStoreJobInfoDelete={handleStoreJobInfoDelete}
+      />
+    );
   }
 
   if (!currentUser) {
@@ -371,7 +413,9 @@ function App() {
           />
         ) : (
           <JobInfoView
+            currentUser={currentUser}
             jobInfos={jobInfos}
+            jobInfoError={jobInfoError}
             jobForm={jobForm}
             isJobFormOpen={isJobFormOpen}
             setJobForm={setJobForm}
@@ -541,7 +585,7 @@ function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onC
   );
 }
 
-function StoreMapView({ checkins, profiles, jobInfos }) {
+function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobInfoDelete }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [storeTab, setStoreTab] = useState("seats");
   const [storeLongTermQuery, setStoreLongTermQuery] = useState("");
@@ -720,10 +764,12 @@ function StoreMapView({ checkins, profiles, jobInfos }) {
         ) : (
           <StoreJobInfoBubbles
             jobInfos={jobInfos}
+            jobInfoError={jobInfoError}
             query={storeJobQuery}
             setQuery={setStoreJobQuery}
             selectedJobInfo={selectedJobInfo}
             setSelectedJobInfo={setSelectedJobInfo}
+            onStoreJobInfoDelete={onStoreJobInfoDelete}
           />
         )}
       </main>
@@ -791,7 +837,15 @@ function StoreLongTermBoard({ profiles, query, setQuery }) {
   );
 }
 
-function StoreJobInfoBubbles({ jobInfos, query, setQuery, selectedJobInfo, setSelectedJobInfo }) {
+function StoreJobInfoBubbles({
+  jobInfos,
+  jobInfoError,
+  query,
+  setQuery,
+  selectedJobInfo,
+  setSelectedJobInfo,
+  onStoreJobInfoDelete,
+}) {
   const normalizedQuery = query.trim().toLowerCase();
   const filteredJobInfos = jobInfos.filter((jobInfo) => (
     !normalizedQuery || String(jobInfo.company_name || "").toLowerCase().includes(normalizedQuery)
@@ -814,6 +868,11 @@ function StoreJobInfoBubbles({ jobInfos, query, setQuery, selectedJobInfo, setSe
       </div>
 
       <div className="relative min-h-[430px] rounded-xl bg-gradient-to-br from-cyan-50 via-white to-emerald-50 border border-slate-100 overflow-hidden p-6">
+        {jobInfoError && (
+          <div className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-500">
+            {jobInfoError}
+          </div>
+        )}
         <div className="flex flex-wrap gap-5 items-center justify-center">
           {filteredJobInfos.map((jobInfo, index) => (
             <button
@@ -858,7 +917,15 @@ function StoreJobInfoBubbles({ jobInfos, query, setQuery, selectedJobInfo, setSe
               <p className="text-sm mt-2 leading-6 whitespace-pre-wrap break-words">{selectedJobInfo.company_impression}</p>
             </div>
           </div>
-          <p className="text-xs text-slate-400 font-bold">投稿者: {selectedJobInfo.submitter_nickname}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-slate-400 font-bold">投稿者: {selectedJobInfo.submitter_nickname}</p>
+            <button
+              onClick={() => onStoreJobInfoDelete(selectedJobInfo)}
+              className="h-9 px-4 rounded-lg bg-red-500 text-white text-xs font-bold active:scale-95"
+            >
+              消去
+            </button>
+          </div>
         </article>
       )}
     </section>
@@ -990,7 +1057,9 @@ function LongTermView({
 }
 
 function JobInfoView({
+  currentUser,
   jobInfos,
+  jobInfoError,
   jobForm,
   isJobFormOpen,
   setJobForm,
@@ -1092,6 +1161,11 @@ function JobInfoView({
           <h2 className="text-xl font-bold text-slate-900">企業情報一覧</h2>
           <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">{jobInfos.length}件</span>
         </div>
+        {jobInfoError && (
+          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-500">
+            {jobInfoError}
+          </div>
+        )}
         <div className="space-y-4">
           {jobInfos.map((jobInfo) => (
             <article key={jobInfo.job_info_id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-4">
@@ -1104,12 +1178,14 @@ function JobInfoView({
                   <h3 className="text-lg font-bold text-slate-900 mt-2 break-words">{jobInfo.company_name}</h3>
                   <p className="text-sm text-slate-600 mt-1 break-words">{jobInfo.role}</p>
                 </div>
-                <button
-                  onClick={() => onJobInfoDelete(jobInfo)}
-                  className="h-8 px-3 rounded-lg bg-red-50 text-red-500 border border-red-100 text-xs font-bold shrink-0 active:scale-95"
-                >
-                  削除
-                </button>
+                {jobInfo.submitter_nickname === currentUser && (
+                  <button
+                    onClick={() => onJobInfoDelete(jobInfo)}
+                    className="h-8 px-3 rounded-lg bg-red-50 text-red-500 border border-red-100 text-xs font-bold shrink-0 active:scale-95"
+                  >
+                    削除
+                  </button>
+                )}
               </div>
               <div className="space-y-3">
                 <div className="bg-slate-50 rounded-lg p-3">
