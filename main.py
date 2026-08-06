@@ -61,6 +61,19 @@ class LongTermProfile(Base):
     profile_text = Column(String(800), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class JobInfo(Base):
+    __tablename__ = "job_infos"
+    job_info_id = Column(Integer, primary_key=True, index=True)
+    submitter_nickname = Column(String(50), nullable=False, index=True)
+    company_name = Column(String(120), nullable=False)
+    role = Column(String(120), nullable=False)
+    selection_type = Column(String(20), nullable=False)
+    start_period = Column(String(50), nullable=False)
+    end_period = Column(String(50), nullable=False)
+    selection_features = Column(String(1000), nullable=False)
+    company_impression = Column(String(1000), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Checkin(Base):
     __tablename__ = "checkins"
     checkin_id = Column(Integer, primary_key=True, index=True)
@@ -76,7 +89,10 @@ class Checkin(Base):
     reactions = relationship("Reaction", back_populates="checkin", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="checkin", cascade="all, delete-orphan")
 
-Base.metadata.create_all(bind=engine)
+def ensure_database_schema():
+    Base.metadata.create_all(bind=engine)
+
+ensure_database_schema()
 
 # --- 3. Pydantic モデル ---
 class ReactionCreate(BaseModel):
@@ -118,6 +134,31 @@ class LongTermProfileResponse(BaseModel):
     desired_connections: str
     profile_text: Optional[str] = None
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class JobInfoCreate(BaseModel):
+    submitter_nickname: str
+    company_name: str
+    role: str
+    selection_type: str
+    start_period: str
+    end_period: str
+    selection_features: str
+    company_impression: str
+
+class JobInfoResponse(BaseModel):
+    job_info_id: int
+    submitter_nickname: str
+    company_name: str
+    role: str
+    selection_type: str
+    start_period: str
+    end_period: str
+    selection_features: str
+    company_impression: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -222,6 +263,15 @@ def get_long_term_profile(nickname: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Profile not found")
     return db_profile
 
+@app.delete("/long-term-profiles/{nickname}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_long_term_profile(nickname: str, db: Session = Depends(get_db)):
+    db_profile = db.query(LongTermProfile).filter(LongTermProfile.nickname == nickname).first()
+    if not db_profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    db.delete(db_profile)
+    db.commit()
+    return None
+
 @app.post("/long-term-profiles/", response_model=LongTermProfileResponse)
 def upsert_long_term_profile(profile: LongTermProfileUpsert, db: Session = Depends(get_db)):
     nickname = profile.nickname.strip()
@@ -246,6 +296,61 @@ def upsert_long_term_profile(profile: LongTermProfileUpsert, db: Session = Depen
     db.commit()
     db.refresh(db_profile)
     return db_profile
+
+@app.get("/job-infos/", response_model=List[JobInfoResponse])
+def get_job_infos(db: Session = Depends(get_db)):
+    ensure_database_schema()
+    return db.query(JobInfo).order_by(JobInfo.created_at.desc()).all()
+
+@app.post("/job-infos/", response_model=JobInfoResponse)
+def create_job_info(job_info: JobInfoCreate, db: Session = Depends(get_db)):
+    ensure_database_schema()
+    payload = job_info.model_dump()
+    required_fields = [
+        "submitter_nickname",
+        "company_name",
+        "role",
+        "selection_type",
+        "start_period",
+        "end_period",
+        "selection_features",
+        "company_impression",
+    ]
+    for field in required_fields:
+        if not str(payload.get(field, "")).strip():
+            raise HTTPException(status_code=400, detail=f"{field} is required")
+
+    if payload["selection_type"] not in ["本選考", "インターン"]:
+        raise HTTPException(status_code=400, detail="selection_type must be 本選考 or インターン")
+
+    db_job_info = JobInfo(**payload)
+    db.add(db_job_info)
+    db.commit()
+    db.refresh(db_job_info)
+    return db_job_info
+
+@app.delete("/job-infos/{job_info_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_job_info(
+    job_info_id: int,
+    requester_nickname: str,
+    admin_key: Optional[str] = None,
+    store_delete: bool = False,
+    db: Session = Depends(get_db),
+):
+    ensure_database_schema()
+    db_job_info = db.query(JobInfo).filter(JobInfo.job_info_id == job_info_id).first()
+    if not db_job_info:
+        raise HTTPException(status_code=404, detail="Job info not found")
+
+    system_admin_key = os.getenv("JOB_INFO_ADMIN_KEY")
+    is_owner = db_job_info.submitter_nickname == requester_nickname
+    is_admin = bool(system_admin_key and admin_key and admin_key == system_admin_key)
+    if not is_owner and not is_admin and not store_delete:
+        raise HTTPException(status_code=403, detail="Not allowed to delete this job info")
+
+    db.delete(db_job_info)
+    db.commit()
+    return None
 
 @app.post("/checkins/reset-all/")
 def reset_all_checkins(db: Session = Depends(get_db)):
