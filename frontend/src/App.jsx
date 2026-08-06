@@ -590,7 +590,6 @@ function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobIn
   const [storeTab, setStoreTab] = useState("seats");
   const [storeLongTermQuery, setStoreLongTermQuery] = useState("");
   const [storeJobQuery, setStoreJobQuery] = useState("");
-  const [selectedJobInfo, setSelectedJobInfo] = useState(null);
   const [communicators, setCommunicators] = useState(() => {
     const savedList = localStorage.getItem("venture_store_communicators");
     const oldSavedName = localStorage.getItem("venture_store_communicator");
@@ -767,8 +766,6 @@ function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobIn
             jobInfoError={jobInfoError}
             query={storeJobQuery}
             setQuery={setStoreJobQuery}
-            selectedJobInfo={selectedJobInfo}
-            setSelectedJobInfo={setSelectedJobInfo}
             onStoreJobInfoDelete={onStoreJobInfoDelete}
           />
         )}
@@ -842,8 +839,6 @@ function StoreJobInfoBubbles({
   jobInfoError,
   query,
   setQuery,
-  selectedJobInfo,
-  setSelectedJobInfo,
   onStoreJobInfoDelete,
 }) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -855,9 +850,9 @@ function StoreJobInfoBubbles({
     <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <p className="text-xs font-bold text-primary">CAREER BUBBLES</p>
-          <h2 className="text-3xl font-black tracking-tight text-slate-900 mt-1">就活情報</h2>
-          <p className="text-sm text-slate-500 mt-2">企業名で検索して、シャボン玉をタップすると詳細を確認できます。</p>
+          <p className="text-xs font-bold text-primary">CAREER BOARD</p>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900 mt-1">就活情報掲示板</h2>
+          <p className="text-sm text-slate-500 mt-2">クルーが登録した企業情報を一覧で確認できます。</p>
         </div>
         <input
           value={query}
@@ -867,67 +862,54 @@ function StoreJobInfoBubbles({
         />
       </div>
 
-      <div className="relative min-h-[430px] rounded-xl bg-gradient-to-br from-cyan-50 via-white to-emerald-50 border border-slate-100 overflow-hidden p-6">
-        {jobInfoError && (
-          <div className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-500">
-            {jobInfoError}
+      {jobInfoError && (
+        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-500">
+          {jobInfoError}
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filteredJobInfos.map((jobInfo) => (
+          <article key={jobInfo.job_info_id} className="border-2 border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+            <div className="bg-primary/10 px-4 py-3 border-b border-slate-200 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-primary">{jobInfo.selection_type}</div>
+                <h3 className="text-2xl font-black text-slate-900 mt-1 break-words">{jobInfo.company_name}</h3>
+                <p className="text-sm font-bold text-slate-600 mt-1 break-words">{jobInfo.role}</p>
+              </div>
+              <button
+                onClick={() => onStoreJobInfoDelete(jobInfo)}
+                className="h-9 px-3 rounded-lg bg-red-50 text-red-500 border border-red-100 text-xs font-bold shrink-0 active:scale-95"
+              >
+                消去
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
+                  {jobInfo.start_period}〜{jobInfo.end_period}
+                </span>
+                <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
+                  投稿者: {jobInfo.submitter_nickname}
+                </span>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                <div className="text-xs font-bold text-slate-500">選考の特徴</div>
+                <p className="text-sm text-slate-700 mt-1 leading-6 whitespace-pre-wrap break-words">{jobInfo.selection_features}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                <div className="text-xs font-bold text-slate-500">企業の特徴</div>
+                <p className="text-sm text-slate-700 mt-1 leading-6 whitespace-pre-wrap break-words">{jobInfo.company_impression}</p>
+              </div>
+            </div>
+          </article>
+        ))}
+        {filteredJobInfos.length === 0 && (
+          <div className="md:col-span-2 xl:col-span-3 text-center text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-10">
+            該当する就活情報がありません。
           </div>
         )}
-        <div className="flex flex-wrap gap-5 items-center justify-center">
-          {filteredJobInfos.map((jobInfo, index) => (
-            <button
-              key={jobInfo.job_info_id}
-              onClick={() => setSelectedJobInfo(jobInfo)}
-              className={`rounded-full border border-white/80 bg-white/70 backdrop-blur-sm shadow-lg text-center active:scale-95 transition-all flex flex-col items-center justify-center p-4 ${
-                index % 3 === 0 ? "w-36 h-36" : index % 3 === 1 ? "w-44 h-44" : "w-32 h-32"
-              }`}
-            >
-              <span className="text-[11px] font-bold text-primary">{jobInfo.selection_type}</span>
-              <span className="text-base font-black text-slate-900 mt-1 break-words">{jobInfo.company_name}</span>
-              <span className="text-xs text-slate-500 mt-1 break-words">{jobInfo.role}</span>
-            </button>
-          ))}
-          {filteredJobInfos.length === 0 && (
-            <div className="text-center text-slate-500 bg-white/80 border border-slate-100 rounded-lg p-10">
-              該当する就活情報がありません。
-            </div>
-          )}
-        </div>
       </div>
-
-      {selectedJobInfo && (
-        <article className="bg-slate-900 text-white rounded-xl p-5 shadow-sm space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-xs font-bold text-primary">{selectedJobInfo.selection_type} / {selectedJobInfo.start_period}〜{selectedJobInfo.end_period}</div>
-              <h3 className="text-2xl font-black mt-1 break-words">{selectedJobInfo.company_name}</h3>
-              <p className="text-sm text-slate-300 mt-1 break-words">{selectedJobInfo.role}</p>
-            </div>
-            <button onClick={() => setSelectedJobInfo(null)} className="h-9 px-3 rounded-lg bg-white/10 text-xs font-bold">
-              閉じる
-            </button>
-          </div>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div className="bg-white/10 rounded-lg p-4">
-              <div className="text-xs font-bold text-slate-300">選考の特徴</div>
-              <p className="text-sm mt-2 leading-6 whitespace-pre-wrap break-words">{selectedJobInfo.selection_features}</p>
-            </div>
-            <div className="bg-white/10 rounded-lg p-4">
-              <div className="text-xs font-bold text-slate-300">企業の特徴</div>
-              <p className="text-sm mt-2 leading-6 whitespace-pre-wrap break-words">{selectedJobInfo.company_impression}</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-slate-400 font-bold">投稿者: {selectedJobInfo.submitter_nickname}</p>
-            <button
-              onClick={() => onStoreJobInfoDelete(selectedJobInfo)}
-              className="h-9 px-4 rounded-lg bg-red-500 text-white text-xs font-bold active:scale-95"
-            >
-              消去
-            </button>
-          </div>
-        </article>
-      )}
     </section>
   );
 }
