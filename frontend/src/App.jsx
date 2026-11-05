@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 
 const AVATAR_LIST = {
   cat: "https://api.dicebear.com/7.x/notionists/svg?seed=Felix&backgroundColor=e2e8f0",
@@ -19,6 +19,8 @@ const AVATAR_LIST = {
 };
 
 const API_BASE_URL = "https://venture-platform-backend.onrender.com";
+const ACCESS_CODE_STORAGE_KEY = "venture_access_code";
+const ADMIN_KEY_STORAGE_KEY = "venture_admin_key";
 
 const SEAT_LAYOUT = [
   { seat: "01", x: 92, y: 69 }, { seat: "02", x: 92, y: 59 },
@@ -48,7 +50,9 @@ const normalizeSeatNumber = (seatNumber) => {
 };
 
 function App() {
-  const isStoreMapView = new URLSearchParams(window.location.search).get("view") === "store-map";
+  const storeView = new URLSearchParams(window.location.search).get("view");
+  const isStoreMonitorView = storeView === "store-map" || storeView === "store-monitor";
+  const isStoreTabletView = storeView === "store-tablet";
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("venture_currentUser") || "");
   const [loginInput, setLoginInput] = useState("");
   const [checkins, setCheckins] = useState([]);
@@ -80,6 +84,30 @@ function App() {
 
   const myCheckin = checkins.find(c => c.nickname === currentUser);
 
+  const getAccessCode = useCallback(() => {
+    let code = localStorage.getItem(ACCESS_CODE_STORAGE_KEY) || "";
+    if (!code) {
+      code = window.prompt("閲覧・投稿用の合言葉を入力してください") || "";
+      if (code) {
+        localStorage.setItem(ACCESS_CODE_STORAGE_KEY, code);
+      }
+    }
+    return code;
+  }, []);
+
+  const secureFetch = useCallback((url, options = {}) => {
+    const code = getAccessCode();
+    if (!code) return Promise.reject(new Error("access code required"));
+
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        "x-access-code": code,
+      },
+    });
+  }, [getAccessCode]);
+
   const fetchCheckins = useCallback(() => {
     fetch(`${API_BASE_URL}/checkins/`)
       .then(res => res.json())
@@ -87,8 +115,11 @@ function App() {
   }, []);
 
   const fetchProfiles = useCallback(() => {
-    fetch(`${API_BASE_URL}/long-term-profiles/`)
-      .then(res => res.json())
+    secureFetch(`${API_BASE_URL}/long-term-profiles/`)
+      .then(res => {
+        if (!res.ok) throw new Error("profile fetch failed");
+        return res.json();
+      })
       .then(data => {
         const nextProfiles = Array.isArray(data) ? data : [];
         const currentProfile = nextProfiles.find(p => p.nickname === currentUser);
@@ -100,11 +131,12 @@ function App() {
             profile_text: currentProfile.profile_text || "",
           });
         }
-      });
-  }, [currentUser]);
+      })
+      .catch(() => setProfiles([]));
+  }, [currentUser, secureFetch]);
 
   const fetchJobInfos = useCallback(() => {
-    fetch(`${API_BASE_URL}/job-infos/`)
+    secureFetch(`${API_BASE_URL}/job-infos/`)
       .then(res => {
         if (!res.ok) throw new Error("job info fetch failed");
         return res.json();
@@ -117,15 +149,21 @@ function App() {
         setJobInfos([]);
         setJobInfoError("就活情報を読み込めませんでした。バックエンドの反映状況を確認してください。");
       });
-  }, []);
+  }, [secureFetch]);
 
   useEffect(() => {
-    fetchCheckins();
-    fetchProfiles();
-    fetchJobInfos();
-    const timer = setInterval(fetchCheckins, 30000);
-    return () => clearInterval(timer);
-  }, [fetchCheckins, fetchProfiles, fetchJobInfos]);
+    if (!isStoreTabletView) {
+      fetchCheckins();
+    }
+    if (!isStoreMonitorView) {
+      fetchProfiles();
+      fetchJobInfos();
+    }
+    const timer = isStoreTabletView ? null : setInterval(fetchCheckins, 30000);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [fetchCheckins, fetchProfiles, fetchJobInfos, isStoreMonitorView, isStoreTabletView]);
 
   const handleLogin = (e) => {
     if (e) e.preventDefault();
@@ -209,7 +247,7 @@ function App() {
 
   const handleProfileSave = (e) => {
     e.preventDefault();
-    fetch(`${API_BASE_URL}/long-term-profiles/`, {
+    secureFetch(`${API_BASE_URL}/long-term-profiles/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -233,7 +271,7 @@ function App() {
   const handleProfileDelete = () => {
     if (!window.confirm("掲載内容を消去しますか？")) return;
 
-    fetch(`${API_BASE_URL}/long-term-profiles/${encodeURIComponent(currentUser)}`, {
+    secureFetch(`${API_BASE_URL}/long-term-profiles/${encodeURIComponent(currentUser)}`, {
       method: "DELETE",
     })
       .then(() => {
@@ -250,7 +288,7 @@ function App() {
 
   const handleJobInfoSave = (e) => {
     e.preventDefault();
-    fetch(`${API_BASE_URL}/job-infos/`, {
+    secureFetch(`${API_BASE_URL}/job-infos/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -281,17 +319,12 @@ function App() {
 
   const handleJobInfoDelete = (jobInfo) => {
     const isOwner = jobInfo.submitter_nickname === currentUser;
-    let adminKey = "";
-    if (!isOwner) {
-      adminKey = window.prompt("管理用キーを入力してください") || "";
-      if (!adminKey) return;
-    }
+    if (!isOwner) return;
     if (!window.confirm("この就活情報を削除しますか？")) return;
 
     const params = new URLSearchParams({ requester_nickname: currentUser });
-    if (adminKey) params.set("admin_key", adminKey);
 
-    fetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
+    secureFetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
       method: "DELETE",
     })
       .then(res => {
@@ -302,15 +335,21 @@ function App() {
   };
 
   const handleStoreJobInfoDelete = (jobInfo) => {
+    let adminKey = localStorage.getItem(ADMIN_KEY_STORAGE_KEY) || "";
+    if (!adminKey) {
+      adminKey = window.prompt("管理用キーを入力してください") || "";
+      if (!adminKey) return;
+      localStorage.setItem(ADMIN_KEY_STORAGE_KEY, adminKey);
+    }
     if (!window.confirm("店舗iPadからこの就活情報を削除しますか？")) return;
 
     const params = new URLSearchParams({
       requester_nickname: "store-ipad",
-      store_delete: "true",
     });
 
-    fetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
+    secureFetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
       method: "DELETE",
+      headers: { "x-admin-key": adminKey },
     })
       .then(res => {
         if (!res.ok) throw new Error("store delete failed");
@@ -319,10 +358,17 @@ function App() {
       .catch(() => window.alert("削除できませんでした"));
   };
 
-  if (isStoreMapView) {
+  if (isStoreMonitorView) {
     return (
-      <StoreMapView
+      <StoreMonitorView
         checkins={checkins}
+      />
+    );
+  }
+
+  if (isStoreTabletView) {
+    return (
+      <StoreTabletView
         profiles={profiles}
         jobInfos={jobInfos}
         jobInfoError={jobInfoError}
@@ -585,11 +631,9 @@ function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onC
   );
 }
 
-function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobInfoDelete }) {
+function StoreMonitorView({ checkins }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
-  const [storeTab, setStoreTab] = useState("seats");
-  const [storeLongTermQuery, setStoreLongTermQuery] = useState("");
-  const [storeJobQuery, setStoreJobQuery] = useState("");
+  const [isAutoCycling, setIsAutoCycling] = useState(true);
   const [communicators, setCommunicators] = useState(() => {
     const savedList = localStorage.getItem("venture_store_communicators");
     const oldSavedName = localStorage.getItem("venture_store_communicator");
@@ -603,11 +647,43 @@ function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobIn
     }
     return [oldSavedName || ""];
   });
-  const activeCheckinsBySeat = checkins.reduce((acc, checkin) => {
+  const activeCheckinsBySeat = useMemo(() => checkins.reduce((acc, checkin) => {
     acc[normalizeSeatNumber(checkin.seat_number)] = checkin;
     return acc;
-  }, {});
+  }, {}), [checkins]);
+  const activeSeatNumbers = useMemo(() => (
+    SEAT_LAYOUT
+      .map(({ seat }) => seat)
+      .filter((seat) => Boolean(activeCheckinsBySeat[seat]))
+  ), [activeCheckinsBySeat]);
   const selectedCheckin = selectedSeat ? activeCheckinsBySeat[selectedSeat] : null;
+
+  useEffect(() => {
+    if (!isAutoCycling) return undefined;
+
+    const showRandomCheckin = () => {
+      setSelectedSeat((currentSeat) => {
+        if (activeSeatNumbers.length === 0) return null;
+        const candidates = activeSeatNumbers.length > 1
+          ? activeSeatNumbers.filter((seat) => seat !== currentSeat)
+          : activeSeatNumbers;
+        return candidates[Math.floor(Math.random() * candidates.length)];
+      });
+    };
+
+    showRandomCheckin();
+    const timer = setInterval(showRandomCheckin, 10000);
+    return () => clearInterval(timer);
+  }, [activeSeatNumbers, isAutoCycling]);
+
+  const handleSeatSelect = (seat) => {
+    setIsAutoCycling(false);
+    setSelectedSeat(seat);
+  };
+
+  const resumeAutoCycling = () => {
+    setIsAutoCycling(true);
+  };
 
   const saveCommunicators = (nextCommunicators) => {
     setCommunicators(nextCommunicators);
@@ -641,22 +717,11 @@ function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobIn
           <div className="flex gap-2 text-xs font-bold">
             <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary">{checkins.length}名が活動中</span>
             <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-500">30秒ごとに更新</span>
+            <span className={`px-3 py-1.5 rounded-full border ${isAutoCycling ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+              {isAutoCycling ? "10秒ごとに自動表示" : "手動表示中"}
+            </span>
           </div>
         </header>
-
-        <div className="grid grid-cols-3 gap-2 bg-slate-200 p-1 rounded-xl border border-slate-300">
-          <button onClick={() => setStoreTab("seats")} className={`h-11 rounded-lg text-sm font-bold ${storeTab === "seats" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
-            座席
-          </button>
-          <button onClick={() => setStoreTab("longTerm")} className={`h-11 rounded-lg text-sm font-bold ${storeTab === "longTerm" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
-            中長期
-          </button>
-          <button onClick={() => setStoreTab("jobInfo")} className={`h-11 rounded-lg text-sm font-bold ${storeTab === "jobInfo" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
-            就活情報
-          </button>
-        </div>
-
-        {storeTab === "seats" ? (
         <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 sm:p-5 overflow-x-auto">
           <div className="relative min-w-[980px] aspect-[16/9] bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
             <div className="absolute right-[6%] top-[6%] w-[28%] bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2">
@@ -700,6 +765,19 @@ function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobIn
             </div>
 
             <div className="absolute left-[43%] top-[66%] w-[35%] min-h-[132px] bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-slate-400">
+                  {isAutoCycling ? "自動表示中" : "選択した席を表示中"}
+                </span>
+                {!isAutoCycling && (
+                  <button
+                    onClick={resumeAutoCycling}
+                    className="h-7 px-2 rounded-md bg-slate-900 text-white text-[10px] font-bold active:scale-95"
+                  >
+                    自動表示に戻す
+                  </button>
+                )}
+              </div>
               {selectedSeat ? (
                 selectedCheckin ? (
                   <div className="flex gap-3">
@@ -739,7 +817,7 @@ function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobIn
               return (
                 <button
                   key={seat}
-                  onClick={() => setSelectedSeat(seat)}
+                  onClick={() => handleSeatSelect(seat)}
                   className={`absolute -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full border-2 text-sm font-bold shadow-sm transition-all ${
                     checkin
                       ? "bg-primary text-white border-primary shadow-primary/30"
@@ -754,7 +832,40 @@ function StoreMapView({ checkins, profiles, jobInfos, jobInfoError, onStoreJobIn
             })}
           </div>
         </section>
-        ) : storeTab === "longTerm" ? (
+      </main>
+    </div>
+  );
+}
+
+function StoreTabletView({ profiles, jobInfos, jobInfoError, onStoreJobInfoDelete }) {
+  const [tabletTab, setTabletTab] = useState("longTerm");
+  const [storeLongTermQuery, setStoreLongTermQuery] = useState("");
+  const [storeJobQuery, setStoreJobQuery] = useState("");
+
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-900 p-4 sm:p-6 font-['Plus_Jakarta_Sans']">
+      <main className="max-w-[1180px] mx-auto space-y-4">
+        <header className="bg-white border border-slate-200 rounded-xl px-5 py-4 shadow-sm">
+          <h1 className="text-2xl font-bold tracking-tight">店舗掲示板</h1>
+          <p className="text-sm text-slate-500 mt-1">中長期の取り組みと就活情報を確認できます。</p>
+        </header>
+
+        <div className="grid grid-cols-2 gap-2 bg-slate-200 p-1 rounded-xl border border-slate-300">
+          <button
+            onClick={() => setTabletTab("longTerm")}
+            className={`h-11 rounded-lg text-sm font-bold ${tabletTab === "longTerm" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+          >
+            中長期
+          </button>
+          <button
+            onClick={() => setTabletTab("jobInfo")}
+            className={`h-11 rounded-lg text-sm font-bold ${tabletTab === "jobInfo" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+          >
+            就活情報
+          </button>
+        </div>
+
+        {tabletTab === "longTerm" ? (
           <StoreLongTermBoard
             profiles={profiles}
             query={storeLongTermQuery}

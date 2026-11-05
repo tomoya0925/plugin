@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, Header, HTTPException, status
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
@@ -187,13 +187,26 @@ class CheckinResponse(BaseModel):
 # --- 4. API エンドポイント ---
 app = FastAPI()
 
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "https://plugin-sandy.vercel.app").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # 全てのサイトからのアクセスを許可
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"], # GET, POST, DELETEなど全て許可
-    allow_headers=["*"], # 全てのヘッダーを許可
+    allow_methods=["*"],
+    allow_headers=["Content-Type", "x-access-code", "x-admin-key"],
 )
+
+def require_access_code(access_code: Optional[str]):
+    expected_access_code = os.getenv("APP_ACCESS_CODE")
+    if not expected_access_code:
+        raise HTTPException(status_code=503, detail="APP_ACCESS_CODE is not configured")
+    if access_code != expected_access_code:
+        raise HTTPException(status_code=401, detail="Invalid access code")
 
 def get_db():
     db = SessionLocal()
@@ -253,18 +266,32 @@ def add_comment(checkin_id: int, comment: CommentCreate, db: Session = Depends(g
     return db_comment
 
 @app.get("/long-term-profiles/", response_model=List[LongTermProfileResponse])
-def get_long_term_profiles(db: Session = Depends(get_db)):
+def get_long_term_profiles(
+    x_access_code: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    require_access_code(x_access_code)
     return db.query(LongTermProfile).order_by(LongTermProfile.updated_at.desc()).all()
 
 @app.get("/long-term-profiles/{nickname}", response_model=LongTermProfileResponse)
-def get_long_term_profile(nickname: str, db: Session = Depends(get_db)):
+def get_long_term_profile(
+    nickname: str,
+    x_access_code: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    require_access_code(x_access_code)
     db_profile = db.query(LongTermProfile).filter(LongTermProfile.nickname == nickname).first()
     if not db_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return db_profile
 
 @app.delete("/long-term-profiles/{nickname}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_long_term_profile(nickname: str, db: Session = Depends(get_db)):
+def delete_long_term_profile(
+    nickname: str,
+    x_access_code: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    require_access_code(x_access_code)
     db_profile = db.query(LongTermProfile).filter(LongTermProfile.nickname == nickname).first()
     if not db_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -273,7 +300,12 @@ def delete_long_term_profile(nickname: str, db: Session = Depends(get_db)):
     return None
 
 @app.post("/long-term-profiles/", response_model=LongTermProfileResponse)
-def upsert_long_term_profile(profile: LongTermProfileUpsert, db: Session = Depends(get_db)):
+def upsert_long_term_profile(
+    profile: LongTermProfileUpsert,
+    x_access_code: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    require_access_code(x_access_code)
     nickname = profile.nickname.strip()
     if not nickname:
         raise HTTPException(status_code=400, detail="Nickname is required")
@@ -298,12 +330,21 @@ def upsert_long_term_profile(profile: LongTermProfileUpsert, db: Session = Depen
     return db_profile
 
 @app.get("/job-infos/", response_model=List[JobInfoResponse])
-def get_job_infos(db: Session = Depends(get_db)):
+def get_job_infos(
+    x_access_code: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    require_access_code(x_access_code)
     ensure_database_schema()
     return db.query(JobInfo).order_by(JobInfo.created_at.desc()).all()
 
 @app.post("/job-infos/", response_model=JobInfoResponse)
-def create_job_info(job_info: JobInfoCreate, db: Session = Depends(get_db)):
+def create_job_info(
+    job_info: JobInfoCreate,
+    x_access_code: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    require_access_code(x_access_code)
     ensure_database_schema()
     payload = job_info.model_dump()
     required_fields = [
@@ -333,10 +374,11 @@ def create_job_info(job_info: JobInfoCreate, db: Session = Depends(get_db)):
 def delete_job_info(
     job_info_id: int,
     requester_nickname: str,
-    admin_key: Optional[str] = None,
-    store_delete: bool = False,
+    x_access_code: Optional[str] = Header(None),
+    x_admin_key: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
+    require_access_code(x_access_code)
     ensure_database_schema()
     db_job_info = db.query(JobInfo).filter(JobInfo.job_info_id == job_info_id).first()
     if not db_job_info:
@@ -344,8 +386,8 @@ def delete_job_info(
 
     system_admin_key = os.getenv("JOB_INFO_ADMIN_KEY")
     is_owner = db_job_info.submitter_nickname == requester_nickname
-    is_admin = bool(system_admin_key and admin_key and admin_key == system_admin_key)
-    if not is_owner and not is_admin and not store_delete:
+    is_admin = bool(system_admin_key and x_admin_key and x_admin_key == system_admin_key)
+    if not is_owner and not is_admin:
         raise HTTPException(status_code=403, detail="Not allowed to delete this job info")
 
     db.delete(db_job_info)
