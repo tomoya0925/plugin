@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useMemo } from 'react';
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 
 const AVATAR_LIST = {
   cat: "https://api.dicebear.com/7.x/notionists/svg?seed=Felix&backgroundColor=e2e8f0",
@@ -18,7 +18,7 @@ const AVATAR_LIST = {
   art4: "https://api.dicebear.com/7.x/lorelei/svg?seed=Ken&backgroundColor=e2e8f0",
 };
 
-const API_BASE_URL = "https://venture-platform-backend.onrender.com";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 const ACCESS_CODE_STORAGE_KEY = "venture_access_code";
 const ADMIN_KEY_STORAGE_KEY = "venture_admin_key";
 
@@ -81,6 +81,7 @@ function App() {
     selection_features: "",
     company_impression: "",
   });
+  const checkinsEtagRef = useRef("");
 
   const myCheckin = checkins.find(c => c.nickname === currentUser);
 
@@ -108,10 +109,22 @@ function App() {
     });
   }, [getAccessCode]);
 
-  const fetchCheckins = useCallback(() => {
-    fetch(`${API_BASE_URL}/checkins/`)
-      .then(res => res.json())
-      .then(data => setCheckins(Array.isArray(data) ? data : []));
+  const fetchCheckins = useCallback(async () => {
+    try {
+      const headers = checkinsEtagRef.current
+        ? { "If-None-Match": checkinsEtagRef.current }
+        : {};
+      const response = await fetch(`${API_BASE_URL}/checkins/`, { headers });
+      if (response.status === 304) return false;
+      if (!response.ok) throw new Error("checkin fetch failed");
+
+      const data = await response.json();
+      checkinsEtagRef.current = response.headers.get("etag") || "";
+      setCheckins(Array.isArray(data) ? data : []);
+      return true;
+    } catch {
+      return false;
+    }
   }, []);
 
   const fetchProfiles = useCallback(() => {
@@ -152,16 +165,28 @@ function App() {
   }, [secureFetch]);
 
   useEffect(() => {
-    if (!isStoreTabletView) {
-      fetchCheckins();
-    }
+    let cancelled = false;
+    let timer = null;
+
     if (!isStoreMonitorView) {
       fetchProfiles();
       fetchJobInfos();
     }
-    const timer = isStoreTabletView ? null : setInterval(fetchCheckins, 30000);
+
+    const refreshCheckins = async () => {
+      const changed = await fetchCheckins();
+      if (cancelled) return;
+
+      // The monitor checks quickly after a change, then backs off when the ETag is unchanged.
+      const nextDelay = isStoreMonitorView && !changed ? 60000 : 30000;
+      timer = window.setTimeout(refreshCheckins, nextDelay);
+    };
+
+    if (!isStoreTabletView) refreshCheckins();
+
     return () => {
-      if (timer) clearInterval(timer);
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
     };
   }, [fetchCheckins, fetchProfiles, fetchJobInfos, isStoreMonitorView, isStoreTabletView]);
 
@@ -716,7 +741,7 @@ function StoreMonitorView({ checkins }) {
           </div>
           <div className="flex gap-2 text-xs font-bold">
             <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary">{checkins.length}名が活動中</span>
-            <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-500">30秒ごとに更新</span>
+            <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-500">30〜60秒ごとに更新</span>
             <span className={`px-3 py-1.5 rounded-full border ${isAutoCycling ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
               {isAutoCycling ? "10秒ごとに自動表示" : "手動表示中"}
             </span>

@@ -3,3 +3,8 @@
 __pycache__/
 venv/
 .env
+.env.local
+.wrangler/
+.wrangler-*
+node_modules/
+dist/

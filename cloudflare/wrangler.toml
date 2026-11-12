@@ -1,0 +1,22 @@
+name = "venture-platform"
+main = "src/index.js"
+compatibility_date = "2026-11-12"
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5173,https://plugin-sandy.vercel.app,https://venture-platform.venture-platform-worker.workers.dev"
+
+[assets]
+directory = "../frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[triggers]
+# 12:00 UTC is 21:00 in Japan.
+crons = ["0 12 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "venture-platform-db"
+database_id = "9b415233-5f8d-4b56-8d2b-634b0878bf10"
+migrations_dir = "migrations"
