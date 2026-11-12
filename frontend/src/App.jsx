@@ -19,7 +19,6 @@ const AVATAR_LIST = {
 };
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-const ACCESS_CODE_STORAGE_KEY = "venture_access_code";
 const ADMIN_KEY_STORAGE_KEY = "venture_admin_key";
 
 const SEAT_LAYOUT = [
@@ -85,30 +84,6 @@ function App() {
 
   const myCheckin = checkins.find(c => c.nickname === currentUser);
 
-  const getAccessCode = useCallback(() => {
-    let code = localStorage.getItem(ACCESS_CODE_STORAGE_KEY) || "";
-    if (!code) {
-      code = window.prompt("閲覧・投稿用の合言葉を入力してください") || "";
-      if (code) {
-        localStorage.setItem(ACCESS_CODE_STORAGE_KEY, code);
-      }
-    }
-    return code;
-  }, []);
-
-  const secureFetch = useCallback((url, options = {}) => {
-    const code = getAccessCode();
-    if (!code) return Promise.reject(new Error("access code required"));
-
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        "x-access-code": code,
-      },
-    });
-  }, [getAccessCode]);
-
   const fetchCheckins = useCallback(async () => {
     try {
       const headers = checkinsEtagRef.current
@@ -128,7 +103,7 @@ function App() {
   }, []);
 
   const fetchProfiles = useCallback(() => {
-    secureFetch(`${API_BASE_URL}/long-term-profiles/`)
+    fetch(`${API_BASE_URL}/long-term-profiles/`)
       .then(res => {
         if (!res.ok) throw new Error("profile fetch failed");
         return res.json();
@@ -146,10 +121,10 @@ function App() {
         }
       })
       .catch(() => setProfiles([]));
-  }, [currentUser, secureFetch]);
+  }, [currentUser]);
 
   const fetchJobInfos = useCallback(() => {
-    secureFetch(`${API_BASE_URL}/job-infos/`)
+    fetch(`${API_BASE_URL}/job-infos/`)
       .then(res => {
         if (!res.ok) throw new Error("job info fetch failed");
         return res.json();
@@ -162,7 +137,7 @@ function App() {
         setJobInfos([]);
         setJobInfoError("就活情報を読み込めませんでした。バックエンドの反映状況を確認してください。");
       });
-  }, [secureFetch]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,7 +247,7 @@ function App() {
 
   const handleProfileSave = (e) => {
     e.preventDefault();
-    secureFetch(`${API_BASE_URL}/long-term-profiles/`, {
+    fetch(`${API_BASE_URL}/long-term-profiles/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -296,7 +271,7 @@ function App() {
   const handleProfileDelete = () => {
     if (!window.confirm("掲載内容を消去しますか？")) return;
 
-    secureFetch(`${API_BASE_URL}/long-term-profiles/${encodeURIComponent(currentUser)}`, {
+    fetch(`${API_BASE_URL}/long-term-profiles/${encodeURIComponent(currentUser)}`, {
       method: "DELETE",
     })
       .then(() => {
@@ -313,7 +288,7 @@ function App() {
 
   const handleJobInfoSave = (e) => {
     e.preventDefault();
-    secureFetch(`${API_BASE_URL}/job-infos/`, {
+    fetch(`${API_BASE_URL}/job-infos/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -349,7 +324,7 @@ function App() {
 
     const params = new URLSearchParams({ requester_nickname: currentUser });
 
-    secureFetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
+    fetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
       method: "DELETE",
     })
       .then(res => {
@@ -372,7 +347,7 @@ function App() {
       requester_nickname: "store-ipad",
     });
 
-    secureFetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
+    fetch(`${API_BASE_URL}/job-infos/${jobInfo.job_info_id}?${params.toString()}`, {
       method: "DELETE",
       headers: { "x-admin-key": adminKey },
     })

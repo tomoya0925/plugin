@@ -17,7 +17,7 @@
 1. GitHubリポジトリへアクセスできること
 2. Cloudflareの対象アカウントへアクセスできること
 3. 本番3画面が開けること
-4. `APP_ACCESS_CODE`と`JOB_INFO_ADMIN_KEY`の管理方法を引き継いでいること
+4. `JOB_INFO_ADMIN_KEY`の管理方法を引き継いでいること
 5. D1のバックアップを取得してから大きな変更を行うこと
 
 ## 2. サービス概要
@@ -108,14 +108,14 @@
 - 項目は「今頑張っていること」「ほしいつながり」「プロフィール」
 - 再入力で更新、消去で削除できる
 - 一覧をクリックするとプロフィール詳細を表示する
-- 閲覧、登録、更新、削除には共有パスコードが必要
+- 暗証番号なしで閲覧、登録、更新、削除できる
 
 #### 就活情報
 
 - 1人が複数企業を登録できる
 - 項目は企業名、職種、本選考・インターン、開始・終了時期、選考の特徴、企業の特徴
 - 投稿者本人、または店舗管理キーを持つスタッフが削除できる
-- 閲覧と投稿には共有パスコードが必要
+- 暗証番号なしで閲覧と投稿ができる
 
 ### 4.2 店舗モニター
 
@@ -175,17 +175,16 @@ crons = ["0 12 * * *"]
 | POST | `/checkins/{id}/reactions/` | なし | リアクション登録 |
 | POST | `/checkins/{id}/comments/` | なし | コメント登録 |
 | POST | `/checkins/reset-all/` | 管理キー | 全員チェックアウト |
-| GET | `/long-term-profiles/` | 共有パスコード | 中長期一覧 |
-| GET | `/long-term-profiles/{nickname}` | 共有パスコード | 中長期詳細 |
-| POST | `/long-term-profiles/` | 共有パスコード | 中長期登録・更新 |
-| DELETE | `/long-term-profiles/{nickname}` | 共有パスコード | 中長期削除 |
-| GET | `/job-infos/` | 共有パスコード | 就活情報一覧 |
-| POST | `/job-infos/` | 共有パスコード | 就活情報登録 |
-| DELETE | `/job-infos/{id}` | 共有パスコード＋条件 | 就活情報削除 |
+| GET | `/long-term-profiles/` | なし | 中長期一覧 |
+| GET | `/long-term-profiles/{nickname}` | なし | 中長期詳細 |
+| POST | `/long-term-profiles/` | なし | 中長期登録・更新 |
+| DELETE | `/long-term-profiles/{nickname}` | なし | 中長期削除 |
+| GET | `/job-infos/` | なし | 就活情報一覧 |
+| POST | `/job-infos/` | なし | 就活情報登録 |
+| DELETE | `/job-infos/{id}` | 投稿者名一致または管理キー | 就活情報削除 |
 
 認証ヘッダー:
 
-- 共有パスコード: `x-access-code`
 - 店舗管理キー: `x-admin-key`
 
 ## 8. D1データ構造
@@ -247,7 +246,6 @@ crons = ["0 12 * * *"]
 
 | Secret | 用途 |
 | --- | --- |
-| `APP_ACCESS_CODE` | 中長期・就活情報の共有パスコード |
 | `JOB_INFO_ADMIN_KEY` | 店舗管理操作、全員退出、就活情報削除 |
 
 Secretの実値は、GitHub、仕様書、チャットの共有資料へ記載しない。
@@ -257,7 +255,6 @@ Secretの実値は、GitHub、仕様書、チャットの共有資料へ記載�
 ```powershell
 cd cloudflare
 npx wrangler secret list
-npx wrangler secret put APP_ACCESS_CODE
 npx wrangler secret put JOB_INFO_ADMIN_KEY
 ```
 
@@ -270,7 +267,7 @@ CloudflareはSecretの現在値を再表示しない。値が不明な場合は�
 - ニックネームは本人確認にならない
 - 就活情報の本人削除判定はニックネーム一致を使用する
 - チェックイン、退出、リアクション、コメントAPIには認証がない
-- 共有パスコードと管理キーは各端末の`localStorage`へ保存される
+- 管理キーは入力した店舗端末の`localStorage`へ保存される
 - 管理キーを共有端末へ入力した場合、その端末を第三者へ渡す前にブラウザデータを消去する
 - 本格運用へ拡大する場合は個別ログインと権限管理の導入を検討する
 
@@ -414,7 +411,7 @@ npm run deploy
 3. 後任者の端末でGitHubとCloudflareへログインする
 4. 後任者が`wrangler whoami`、`wrangler d1 list`、`wrangler deployments list`を実行する
 5. D1をエクスポートしてバックアップする
-6. `APP_ACCESS_CODE`と`JOB_INFO_ADMIN_KEY`を新しい値へ変更する
+6. `JOB_INFO_ADMIN_KEY`を新しい値へ変更する
 7. お客さん、店舗モニター、店舗タブレットの動作を後任者と一緒に確認する
 8. 問題がないことを確認してから前任者のアクセス権を外す
 
@@ -470,9 +467,9 @@ npx wrangler d1 execute venture-platform-db --remote --file backup.sql
 
 ### 中長期・就活情報が表示されない
 
-1. 共有パスコードを再入力する
-2. ブラウザの`venture_access_code`を削除して再入力する
-3. Cloudflare Secret `APP_ACCESS_CODE`が登録されているか確認する
+1. `/health`を確認する
+2. ブラウザを再読み込みする
+3. D1の対象テーブルとWorkerログを確認する
 
 ### 店舗管理削除ができない
 

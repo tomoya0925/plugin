@@ -26,7 +26,6 @@ npm run db:migrate:remote
 ## 2. Configure Worker secrets
 
 ```powershell
-npx wrangler secret put APP_ACCESS_CODE
 npx wrangler secret put JOB_INFO_ADMIN_KEY
 npm run deploy
 ```

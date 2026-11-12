@@ -58,36 +58,29 @@ async function route(request, env, url, path) {
   }
 
   if (path === "/long-term-profiles" && request.method === "GET") {
-    await requireAccessCode(request, env);
     return getLongTermProfiles(env);
   }
   if (path === "/long-term-profiles" && request.method === "POST") {
-    await requireAccessCode(request, env);
     return upsertLongTermProfile(request, env);
   }
 
   match = path.match(/^\/long-term-profiles\/(.+)$/);
   if (match && request.method === "GET") {
-    await requireAccessCode(request, env);
     return getLongTermProfile(decodeURIComponent(match[1]), env);
   }
   if (match && request.method === "DELETE") {
-    await requireAccessCode(request, env);
     return deleteLongTermProfile(decodeURIComponent(match[1]), env);
   }
 
   if (path === "/job-infos" && request.method === "GET") {
-    await requireAccessCode(request, env);
     return getJobInfos(env);
   }
   if (path === "/job-infos" && request.method === "POST") {
-    await requireAccessCode(request, env);
     return createJobInfo(request, env);
   }
 
   match = path.match(/^\/job-infos\/(\d+)$/);
   if (match && request.method === "DELETE") {
-    await requireAccessCode(request, env);
     return deleteJobInfo(Number(match[1]), request, env, url);
   }
 
@@ -347,14 +340,6 @@ async function bumpCheckinsVersion(env) {
   `).run();
 }
 
-async function requireAccessCode(request, env) {
-  if (!env.APP_ACCESS_CODE) throw new ApiError(503, "APP_ACCESS_CODE is not configured");
-  const supplied = request.headers.get("x-access-code") ?? "";
-  if (!(await safeEqual(supplied, env.APP_ACCESS_CODE))) {
-    throw new ApiError(401, "Invalid access code");
-  }
-}
-
 async function requireAdminKey(request, env) {
   if (!env.JOB_INFO_ADMIN_KEY) throw new ApiError(503, "JOB_INFO_ADMIN_KEY is not configured");
   const supplied = request.headers.get("x-admin-key") ?? "";
@@ -430,7 +415,7 @@ function corsHeaders(request, env) {
     .filter(Boolean);
   const headers = {
     "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
-    "access-control-allow-headers": "Content-Type,x-access-code,x-admin-key,If-None-Match",
+    "access-control-allow-headers": "Content-Type,x-admin-key,If-None-Match",
     "access-control-expose-headers": "ETag",
     "access-control-max-age": "86400",
     vary: "Origin",
