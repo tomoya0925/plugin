@@ -1,7 +1,9 @@
 # Venture Platform システム仕様書・引継ぎ手順
 
-最終更新日: 2026-11-12  
-対象リポジトリ: `https://github.com/tomoya0925/plugin`  
+最終更新日: 2026-11-12
+
+対象リポジトリ: `https://github.com/tomoya0925/plugin`
+
 本番環境: Cloudflare Workers + Static Assets + D1
 
 ## 1. 文書の目的
@@ -503,4 +505,3 @@ npx wrangler d1 execute venture-platform-db --remote --file backup.sql
 - 本番公開後にテストデータを必ず削除する
 - 無関係な機能を同時に変更しない
 - URLを変更した場合は店内端末、QRコード、CORS、仕様書を同時に更新する
-
