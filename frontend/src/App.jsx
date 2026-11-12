@@ -659,19 +659,6 @@ function CheckinCard({ checkin, currentUser, commentValue, setCommentInputs, onC
 function StoreMonitorView({ checkins }) {
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [isAutoCycling, setIsAutoCycling] = useState(true);
-  const [communicators, setCommunicators] = useState(() => {
-    const savedList = localStorage.getItem("venture_store_communicators");
-    const oldSavedName = localStorage.getItem("venture_store_communicator");
-    if (savedList) {
-      try {
-        const parsedList = JSON.parse(savedList);
-        if (Array.isArray(parsedList) && parsedList.length > 0) return parsedList;
-      } catch {
-        return [oldSavedName || ""];
-      }
-    }
-    return [oldSavedName || ""];
-  });
   const activeCheckinsBySeat = useMemo(() => checkins.reduce((acc, checkin) => {
     acc[normalizeSeatNumber(checkin.seat_number)] = checkin;
     return acc;
@@ -710,27 +697,6 @@ function StoreMonitorView({ checkins }) {
     setIsAutoCycling(true);
   };
 
-  const saveCommunicators = (nextCommunicators) => {
-    setCommunicators(nextCommunicators);
-    localStorage.setItem("venture_store_communicators", JSON.stringify(nextCommunicators));
-  };
-
-  const handleCommunicatorChange = (index, value) => {
-    const nextCommunicators = communicators.map((name, currentIndex) => (
-      currentIndex === index ? value : name
-    ));
-    saveCommunicators(nextCommunicators);
-  };
-
-  const addCommunicator = () => {
-    saveCommunicators([...communicators, ""]);
-  };
-
-  const removeCommunicator = (index) => {
-    const nextCommunicators = communicators.filter((_, currentIndex) => currentIndex !== index);
-    saveCommunicators(nextCommunicators.length > 0 ? nextCommunicators : [""]);
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-4 sm:p-6 font-['Plus_Jakarta_Sans']">
       <main className="max-w-[1180px] mx-auto space-y-4">
@@ -749,47 +715,7 @@ function StoreMonitorView({ checkins }) {
         </header>
         <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 sm:p-5 overflow-x-auto">
           <div className="relative min-w-[980px] aspect-[16/9] bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
-            <div className="absolute right-[6%] top-[6%] w-[28%] bg-white border border-slate-200 rounded-lg shadow-sm p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <label className="block text-[11px] font-bold text-slate-500">今日のコミュニケーター</label>
-                <button
-                  onClick={addCommunicator}
-                  className="h-7 px-2 rounded-md bg-slate-900 text-white text-[11px] font-bold active:scale-95"
-                >
-                  追加
-                </button>
-              </div>
-              <div className="space-y-1.5">
-                {communicators.map((name, index) => (
-                  <div key={index} className="flex gap-1.5">
-                    <input
-                      value={name}
-                      onChange={(e) => handleCommunicatorChange(index, e.target.value)}
-                      className="min-w-0 flex-1 h-8 px-2 rounded-md border border-slate-200 text-sm font-bold outline-none focus:border-primary"
-                      placeholder={`名前 ${index + 1}`}
-                    />
-                    {communicators.length > 1 && (
-                      <button
-                        onClick={() => removeCommunicator(index)}
-                        className="w-8 h-8 rounded-md bg-red-50 text-red-500 border border-red-100 text-[11px] font-bold active:scale-95"
-                      >
-                        削除
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <a
-                href="https://canva.link/anzwwd3v1m3lmbf"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-center h-9 rounded-md bg-primary text-white text-xs font-bold active:scale-95"
-              >
-                Canvaを開く
-              </a>
-            </div>
-
-            <div className="absolute left-[43%] top-[66%] w-[35%] min-h-[132px] bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+            <div className="absolute right-[5%] top-[5%] w-[34%] min-h-[150px] bg-white border border-slate-200 rounded-lg shadow-sm p-4">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <span className="text-[10px] font-bold text-slate-400">
                   {isAutoCycling ? "自動表示中" : "選択した席を表示中"}
