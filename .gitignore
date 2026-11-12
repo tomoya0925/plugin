@@ -8,3 +8,4 @@ venv/
 .wrangler-*
 node_modules/
 dist/
+backup*.sql

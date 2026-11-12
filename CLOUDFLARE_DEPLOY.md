@@ -1,5 +1,8 @@
 # Cloudflare deployment
 
+System behavior, operations, security notes, and account transfer procedures are
+documented in `docs/HANDOVER_SPEC.md`.
+
 Cloudflare's current Pages deployment runs on Workers with Static Assets. The
 React frontend and API are deployed together as one Worker backed by D1.
 
@@ -28,7 +31,7 @@ npx wrangler secret put JOB_INFO_ADMIN_KEY
 npm run deploy
 ```
 
-Update `ALLOWED_ORIGINS` in `cloudflare/wrangler.toml` with the final Pages
+Update `ALLOWED_ORIGINS` in `cloudflare/wrangler.toml` with the final Worker
 domain before the production deploy. Do not put either secret in the file.
 
 ## 3. Build and deploy
